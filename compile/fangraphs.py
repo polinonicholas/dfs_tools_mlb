@@ -1,9 +1,7 @@
 from dfs_tools_mlb.utils.subclass import Map
-from functools import lru_cache
 
-@lru_cache()
-def fangraphs_info():
-	fangraphs_url_params = Map({
+
+fangraphs_url_params = Map({
 		#either hitting/pitching
 		'runners_on': 58,
 		'h_lhp': 1,
@@ -98,10 +96,10 @@ def fangraphs_info():
 		'p_al': 178,
 		'p_nl': 194,
 		})
-	fangraphs_urls = {
+fangraphs_urls = {
 	        'active_hitters': 'https://www.fangraphs.com/projections.aspx?pos=all&stats=bat&type=zips&team=0&lg=all&players=0',
 	        'active_pitchers': 'https://www.fangraphs.com/projections.aspx?pos=all&stats=pit&type=zips&team=0&lg=all&players=0'
 	        }
-	return Map({
+fangraphs_info = Map({
 	'fangraphs_urls': fangraphs_urls, 
 	'fangraphs_url_params': fangraphs_url_params})

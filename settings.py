@@ -17,5 +17,27 @@ if driver_settings.get('os', None) == 'windows' and driver_settings.get('profile
 storage_settings = {
 	'archive_stats': False,
 }
-# storage_settings['storage_path'].mkdir(exist_ok=True, parents=True)
+
+stat_splits ={
+	#left/right splits
+	'h_lr': True,
+	'sp_lr': True,
+	'rp_lr': True,
+	#home/away splits
+	'h_ha': True,
+	'sp_ha': True,
+	'rp_ha': True,
+	#pitching with runners on base
+	'sp_ro': True,
+	'rp_ro': True,
+	#SP second time through order stats
+	'sp_so': True,
+	#stats over last 30 days
+	'h_30': False,
+	'sp_30': False,
+	'rp_30': False,
+	#relif IP yesterday
+	'rp_ytd': False
+}
+
 
