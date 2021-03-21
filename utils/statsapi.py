@@ -41,7 +41,7 @@ def full_schedule(
     params.update(
         {
             "sportId": str(sportId),
-            "fields": 'dates,date,games,gamePk,status,codedGameState,totalGames,totalGamesInProgress'
+            "fields": 'dates,date,games,gamePk,status,codedGameState,totalGames,totalGamesInProgress,seriesGameNumber'
         }
     )
 

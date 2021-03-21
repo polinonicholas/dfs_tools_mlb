@@ -300,19 +300,3 @@ q_vl.loc[q_vl['fd_ps_b_vl'].nlargest(50).index, ['fd_ps_b_vl', 'fd_pa_b_vl','bat
 
 
 
-from dfs_tools_mlb.compile.mlb import historical_data
-
-data = historical_data(2020,2022)
-data.loc[0]
-import statsapi
-game = statsapi.get('game', {'gamePks': '630851'})
-
-
-game.keys()
-game['liveData'].keys()
-game['liveData']['boxscore']['teams']['away']['teamStats']['batting']
-
-z = statsapi.get('schedule', {'gamePks': '630851,631377', 'sportId': 1})
-
-a = statsapi.get('game_boxscore', {'gamePk':630851 })
-t = statsapi.get('schedule', {'hydrate': 'scoringPlays','sportId': 1, 'startDate': k, 'endDate': v})['dates']

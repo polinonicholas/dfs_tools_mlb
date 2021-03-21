@@ -264,9 +264,6 @@ team_info = Map({
         'location': 'flushing',
         'venue': {'id': 3289, 'name': 'Citi Field', 'link': '/api/v1/venues/3289'}
         },
-    'info':{
-        'updated': 2021
-        } 
     })
 from functools import lru_cache
 @lru_cache
@@ -278,3 +275,117 @@ def current_parks():
     return parks
         
 parks = current_parks()
+
+
+from dfs_tools_mlb.compile import game_data
+game_data['fd_points']
+import pandas as pd
+game_data.columns.tolist()
+game_data = game_data[game_data['last_inning'] >= 9].apply(pd.to_numeric, errors = 'ignore')
+game_data['fd_points'] = (game_data['runs'] * 6.7) + (game_data['hits'] * 3)
+wind_out = game_data[game_data['wind_direction'].isin(mlb_api_codes.weather.wind_out)]
+wind_in = game_data[game_data['wind_direction'].isin(mlb_api_codes.weather.wind_in)]
+high_wind = game_data[game_data['wind_speed'] > game_data['wind_speed'].mean()]
+low_wind = game_data[(game_data['wind_speed'] < game_data['wind_speed'].mean()) | (game_data['wind_speed'] == 'None')]
+hot = game_data[game_data['temp'] > game_data['temp'].mean()]
+cool = game_data[game_data['temp'] < game_data['temp'].mean()]
+day = game_data[game_data['day_night'] == 'day']
+night = game_data[game_data['day_night'] == 'night']
+high_scoring = game_data[(game_data['runs'] > game_data['runs'].mean()) & (game_data['hits'] > game_data['hits'].mean())]
+low_scoring = game_data[(game_data['runs'] < game_data['runs'].mean()) & (game_data['hits'] < game_data['hits'].mean())]
+roof_closed = game_data[game_data['condition'].isin(mlb_api_codes.weather.roof_closed)]
+roof_open = game_data[game_data['condition'].isin(mlb_api_codes.weather.roof_open)]
+inclement_weather = game_data[game_data['condition'].isin(mlb_api_codes.weather.inclement)]
+clear_weather = game_data[game_data['condition'].isin(mlb_api_codes.weather.clear)]
+rain = game_data[game_data['condition'].isin(mlb_api_codes.weather.rain)]
+
+high_scoring[['temp', 'wind_speed', 'fd_points']].describe()
+low_scoring[['temp', 'wind_speed', 'fd_points']].describe()
+
+wind_out['fd_points'].describe()
+wind_in['fd_points'].describe()
+high_wind['fd_points'].describe()
+low_wind['fd_points'].describe()
+hot['fd_points'].describe()
+cool['fd_points'].describe()
+day['fd_points'].describe()
+night['fd_points'].describe()
+roof_closed['fd_points'].describe()
+roof_open['fd_points'].describe()
+inclement_weather['fd_points'].describe()
+clear_weather['fd_points'].describe()
+rain['fd_points'].describe()
+
+per = hot['fd_points'].mean() / game_data['fd_points'].mean()
+per_c = cool['fd_points'].mean() / game_data['fd_points'].mean()
+
+
+rp['age_z'] = (((rp['Age'] - rp['Age'].mean())/rp['Age'].std())*-1)
+
+
+
+
+
+
+def fd_venue(venue_id):
+    return 
+
+
+
+game_data['condition'].unique()
+
+
+
+
+game_data[['runs', 'hits','away_score', 'home_score']].describe()
+
+above_avg = game_data[(game_data['runs'] > game_data['runs'].mean()) & (game_data['hits'] > game_data['hits'].mean())]
+below_avg = game_data[(game_data['runs'] < game_data['runs'].mean()) & (game_data['hits'] < game_data['hits'].mean())]
+
+
+above_avg[['temp', 'series_game' , 'wind_speed']].describe()
+below_avg[['temp', 'series_game' , 'wind_speed']].describe()
+
+
+game_data['wind_direction'].unique()
+
+below_avg[below_avg['wind_direction'].str.contains('In')].count()
+
+above_avg['wind_direction']
+
+above_avg['temp'].describe()
+
+giants = game_data[game_data['venue_id'] == 2395].reset_index(drop=True)
+fenway = game_data[game_data['venue_id'] == 3].reset_index(drop=True)
+coors_games = game_data[game_data['venue_id'] == 19].reset_index(drop=True)
+citi_games = game_data[game_data['venue_id'] == 3289].reset_index(drop=True)
+citi_games[['runs','hits']].describe()
+coors_games[['runs', 'hits']].describe()
+fenway[['runs', 'hits']].describe()
+giants[['runs', 'hits']].describe()
+
+under_9 = game_data[game_data['last_inning']< 9]
+
+under_9['last_inning']
+
+game_data.loc[0]
+
+test =pd.merge(giants, above_avg, on ='game')
+test2 =pd.merge(giants, below_avg, on ='game')
+test[['temp_x', 'series_game_x' , 'wind_speed_x']].describe()
+test2[['temp_x', 'series_game_x' , 'wind_speed_x']].describe()
+
+
+test =pd.merge(fenway, above_avg, on ='game')
+test2 =pd.merge(fenway, below_avg, on ='game')
+test[['temp_x', 'series_game_x' , 'wind_speed_x']].describe()
+test2[['temp_x', 'series_game_x' , 'wind_speed_x']].describe()
+
+test =pd.merge(coors_games, above_avg, on ='game')
+test2 =pd.merge(coors_games, below_avg, on ='game')
+test[['temp_x', 'series_game_x' , 'wind_speed_x']].describe()
+test2[['temp_x', 'series_game_x' , 'wind_speed_x']].describe()
+
+
+
+

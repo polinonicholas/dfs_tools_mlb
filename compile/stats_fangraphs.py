@@ -3,6 +3,7 @@ from dfs_tools_mlb.compile.fangraphs import fangraphs_urls
 from dfs_tools_mlb.compile.static_mlb import team_info
 from dfs_tools_mlb.utils.time import time_frames as tf
 from dfs_tools_mlb import settings
+from dfs_tools_mlb import config
 from dfs_tools_mlb.utils.selenium import dl_wait_chrome
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -50,12 +51,12 @@ class Stats:
         self.get_stats
     @staticmethod
     def get_driver():
-        if settings.driver_settings.get('name', 'chrome') == 'chrome':
-            driver = webdriver.Chrome(settings.driver_path, options=settings.driver_options)
+        if config.driver_settings.get('name', 'chrome') == 'chrome':
+            driver = webdriver.Chrome(config.driver_path, options=config.driver_options)
             return driver
     @staticmethod
     def driver_downloads(driver):
-        if settings.driver_settings.get('name', 'chrome') == 'chrome':
+        if config.driver_settings.get('name', 'chrome') == 'chrome':
             paths = WebDriverWait(driver, 120, 1).until(dl_wait_chrome)
             return paths
     @staticmethod

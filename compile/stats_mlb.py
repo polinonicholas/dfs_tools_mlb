@@ -1,5 +1,5 @@
 from dfs_tools_mlb.utils.strings import ids_string
-from dfs_tools_mlb.compile.game_data import current_season
+from dfs_tools_mlb.compile.historical_data import current_season
 from dfs_tools_mlb.utils.storage import pickle_path
 from dfs_tools_mlb import settings
 import statsapi

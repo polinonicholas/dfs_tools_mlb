@@ -5,13 +5,14 @@ import pandas as pd
 from dfs_tools_mlb.utils.pd import sm_merge_arb, sm_merge
 from dfs_tools_mlb.compile import current_season as cs
 from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
-from dfs_tools_mlb.compile.stats_mlb import get_statcast_longterm
 from dfs_tools_mlb.utils.statsapi import full_schedule
-from dfs_tools_mlb.utils.storage import json_path, pickle_path
+from dfs_tools_mlb.utils.storage import json_path
 import json
 from dfs_tools_mlb.compile.static_mlb import team_info
 from json import JSONDecodeError
 from dfs_tools_mlb.utils.strings import plural
+from dfs_tools_mlb.compile.stats_fangraphs import Stats
+from dfs_tools_mlb.compile import game_data
 
 class Team:
     def __init__(self, mlb_id, name='',):
@@ -254,93 +255,139 @@ class Team:
     def future_games(self):
         return [x for x in self.all_games if x['games'][0]['status']['codedGameState'] in mac.game_status.pre]
     @cached_property
+    def past_games(self):
+        return [x for x in self.all_games if x['games'][0]['status']['codedGameState'] in mac.game_status.post]
+    @cached_property
     def next_game_pk(self):
         try:
             return self.future_games[0]['games'][0]['gamePk']
         except IndexError:
-            return f'{self.name.capitalize()} have no scheduled games.'
-    @cached_property
-    def next_game(self):
-        try:
-            print(f"Getting boxscore for {self.name.capitalize()}' next game.")
-            return statsapi.get('game', {'gamePk': self.next_game_pk})
-        except TypeError:
-            return self.next_game_pk
-    @cached_property
-    def past_games(self):
-        return [x for x in self.all_games if x['games'][0]['status']['codedGameState'] in mac.game_status.post]
+            print("No games on schedule.")
+            return False
     @cached_property
     def last_game_pk(self):
         try:
             return self.past_games[-1]['games'][0]['gamePk']
         except IndexError:
-            return f'The {self.name.capitalize()} have yet to play in {cs.season_id}.'
+            print(f'The {self.name.capitalize()} have yet to play in {cs.season_id}.')
+            return False
+    @cached_property
+    def next_game(self):
+        if self.next_game_pk:
+            print(f"Getting boxscore for {self.name.capitalize()}' next game.")
+            return statsapi.get('game', {'gamePk': self.next_game_pk})
+        return self.next_game_pk
     @cached_property
     def last_game(self):
-        try:
+        if self.last_game_pk:
             print(f"Getting boxscore {self.name.capitalize()}' last game.")
             return statsapi.get('game', {'gamePk': self.last_game_pk})
-        except TypeError:
-            return self.last_game_pk
-        
+        return self.last_game_pk
     @cached_property
     def is_home(self):
-        try:
+        if self.next_game_pk:
             return int(self.next_game['gameData']['teams']['home']['id']) == self.id
-        except(ValueError, TypeError):
-            return self.next_game_pk
+        return self.next_game_pk
+    @cached_property
+    def was_home(self):
+        if self.last_game_pk:
+            return int(self.last_game['gameData']['teams']['home']['id']) == self.id
+        return self.last_game_pk
+    
     @cached_property
     def ha(self):
-        if type(self.is_home) == bool:
+        if self.next_game_pk:
             if self.is_home:
                 return 'home'
             else:
                 return 'away'
-        else:
-            return self.next_game_pk
+        return self.next_game_pk
+    
     @cached_property
     def opp_ha(self):
-        
-        if self.ha == 'home':
-            return 'away'
-        elif self.ha == 'away':
-            return 'home'
-        else:
-            return self.next_game_pk
-    @cached_property
-    def was_home(self):
-        try:
-            return int(self.last_game['gameData']['teams']['home']['id']) == self.id
-        except(ValueError, TypeError):
-            return self.last_game_pk
+        if self.next_game_pk:
+            if self.ha == 'home':
+                return 'away'
+            elif self.ha == 'away':
+                return 'home'
+        return self.next_game_pk
+    
     @cached_property
     def was_ha(self):
-        if type(self.was_home) == bool:
+        if self.last_game_pk:
             if self.was_home:
                 return 'home'
             else:
                 return 'away'
-        else:
-            return self.last_game_pk
+        return self.last_game_pk
     @cached_property
     def opp_was_ha(self):
-        if self.was_ha == 'home':
-            return 'away'
-        elif self.was_ha == 'away':
-            return 'home'
-        else:
-            return self.last_game_pk
+        if self.last_game_pk:
+            if self.was_ha == 'home':
+                return 'away'
+            elif self.was_ha == 'away':
+                return 'home'
+        return self.last_game_pk
+    @cached_property
+    def opp_sp(self):
+        if self.next_game_pk:
+            try:
+                sp_id = 'ID' + str(self.next_game['gameData']['probablePitchers'][self.opp_ha]['id'])
+                sp_info = self.next_game['gameData']['players'][sp_id]
+                return sp_info
+            except KeyError:
+                return f"The {self.opp_name} have not confirmed their starting pitcher."
+        return self.next_game_pk
+    @cached_property
+    def last_opp_sp(self):
+        if self.last_game_pk:
+            sp_id = 'ID' + str(self.last_game['gameData']['probablePitchers'][self.opp_was_ha]['id'])
+            sp_info = self.last_game['gameData']['players'][sp_id]
+            return sp_info
+        return self.last_game_pk
+    @cached_property
+    def opp_sp_hand(self):
+        try:
+            return self.opp_sp['pitchHand']['code']
+        except TypeError:
+            print(f"{self.opp_sp} returning default 'R'")
+            return 'R'
+    @cached_property
+    def last_opp_sp_hand(self):
+        if self.last_game_pk:
+            return self.last_opp_sp['pitchHand']['code']
+        return self.last_game_pk
+    @cached_property
+    def opp_name(self):
+        if self.next_game_pk:
+            return self.next_game['gameData']['teams'][self.opp_ha]['teamName']
+        return self.next_game_pk
+    @staticmethod
+    def lineups():
+        path = json_path(name='team_lineups')
+        try:
+            with open(path) as file:
+                team_lineups = json.load(file)
+                file.close()
+            return team_lineups
+        except (FileNotFoundError, JSONDecodeError):
+            team_lineups = {}
+            for team in team_info.keys():
+                team_lineups[team] = {'L': [], 'R': []}
+            with open(path, "w+") as file:
+                json.dump(team_lineups, file)
+                file.close()
+            return team_lineups
     @cached_property
     def lineup(self):
-        try:
+        if self.next_game_pk:
             lineup = self.next_game['liveData']['boxscore']['teams'][self.ha]['battingOrder']
             if len(lineup) == 9:
                 self.update_lineup(lineup, self.opp_sp_hand)
                 return lineup
             else:
                 return self.projected_lineup
-        except TypeError:
-            return self.next_game_pk
+        return self.next_game_pk
     @cached_property
     def projected_lineup(self):
         team_lineups = Team.lineups()
@@ -359,36 +406,6 @@ class Team:
                 return lineup
         except (KeyError, TypeError):
             return self.last_game_pk + "projected lineup will be available after first spring training game."
-    @cached_property
-    def opp_sp(self):
-        try:
-            sp_id = 'ID' + str(self.next_game['gameData']['probablePitchers'][self.opp_ha]['id'])
-            sp_info = self.next_game['gameData']['players'][sp_id]
-            return sp_info
-        except KeyError:
-            return f"The {self.opp_name} have not confirmed their starting pitcher."
-    @cached_property
-    def last_opp_sp(self):
-        try:
-            sp_id = 'ID' + str(self.last_game['gameData']['probablePitchers'][self.opp_was_ha]['id'])
-            sp_info = self.last_game['gameData']['players'][sp_id]
-            return sp_info
-        except TypeError:
-            return self.last_game_pk
-    @cached_property
-    def opp_sp_hand(self):
-        try:
-            return self.opp_sp['pitchHand']['code']
-        except TypeError:
-            print(f"{self.opp_sp} returning default 'R'")
-            return 'R'
-    @cached_property
-    def last_opp_sp_hand(self):
-        try:
-            return self.last_opp_sp['pitchHand']['code']
-        except TypeError:
-            return self.last_game_pk + "last sp info. Will be available after first spring-training game."
-        
     def update_lineup(self, lineup, hand):
         team_lineups = Team.lineups()
         team_lineups[self.name][hand] = lineup
@@ -396,6 +413,41 @@ class Team:
             json.dump(team_lineups, file)
             file.close()
         return lineup
+    def lineup_df(self):
+        try:
+            lineup_ids = self.lineup
+            lineup = pd.DataFrame(lineup_ids, columns= ["mlb_id"])
+            roster = pd.DataFrame(self.full_roster)
+            merged = pd.merge(lineup, roster, on="mlb_id")
+            stats = Stats.current_stats()
+            lineup_stats = sm_merge(merged, stats, columns=['name', 'team'], ratios=[1, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('_mlb', '_fg'))
+            def merge_closest(stats_df):
+                ratio = .99
+                while len(stats_df.index) < 9:
+                    stats_df = sm_merge(merged, stats, columns=['name', 'team'], ratios=[ratio, 1], prefix='m_', reset_index=True, post_drop=True, suffixes=('_mlb', '_fg'))
+                    ratio -= .01
+                    if ratio < .8:
+                        break
+                stats_df = stats_df[stats_df['mlb_id'].isin(lineup_ids)]
+                if len(stats_df.index) != 9:
+                    if len(stats_df.index) < 9:
+                        for i_d in lineup_ids:
+                            if i_d not in stats_df['mlb_id'].values:
+                                new_row = roster[roster['mlb_id'] == i_d]
+                                stats_df = stats_df.append(new_row, ignore_index = True)
+                    if len(stats_df.index) > 9:
+                        stats_df = stats_df.loc[~stats_df.duplicated(subset=['mlb_id'])]
+                sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
+                stats_df['order'] = stats_df['mlb_id'].map(sorter)
+                stats_df.sort_values(by='order',inplace=True, kind='mergesort ')
+                stats_df['order'] = stats_df['order'] + 1
+                stats_df.reset_index(inplace=True, drop=True)
+                        
+                return stats_df
+            return merge_closest(lineup_stats)
+        except ValueError:
+            return self.lineup
+        
     def live_game(self):
         try:
             game = next(x for x in self.all_games if x['games'][0]['status']['codedGameState'] in mac.game_status.live)['games'][0]
@@ -438,8 +490,6 @@ class Team:
                 flag -= 1
             except IndexError:
                 break
-            
-            
         count = current_play['count']
         outs = count['outs']
         out_string = plural(outs,'out')
@@ -473,73 +523,120 @@ class Team:
             pass
         return None
     
-    def lineup_df(self):
-        try:
-            lineup_ids = self.lineup
-            lineup = pd.DataFrame(lineup_ids, columns= ["mlb_id"])
-            roster = pd.DataFrame(self.full_roster)
-            merged = pd.merge(lineup, roster, on="mlb_id")
-            stats = Stats.current_stats()
-            lineup_stats = sm_merge(merged, stats, columns=['name', 'team'], ratios=[1, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('_mlb', '_fg'))
-            def merge_closest(stats_df):
-                ratio = .99
-                while len(stats_df.index) < 9:
-                    stats_df = sm_merge(merged, stats, columns=['name', 'team'], ratios=[ratio, 1], prefix='m_', reset_index=True, post_drop=True, suffixes=('_mlb', '_fg'))
-                    ratio -= .01
-                    if ratio < .8:
-                        break
-                stats_df = stats_df[stats_df['mlb_id'].isin(lineup_ids)]
-                if len(stats_df.index) != 9:
-                    if len(stats_df.index) < 9:
-                        for i_d in lineup_ids:
-                            if i_d not in stats_df['mlb_id'].values:
-                                new_row = roster[roster['mlb_id'] == i_d]
-                                stats_df = stats_df.append(new_row, ignore_index = True)
-                    if len(stats_df.index) > 9:
-                        stats_df = stats_df.loc[~stats_df.duplicated(subset=['mlb_id'])]
-                sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
-                stats_df['order'] = stats_df['mlb_id'].map(sorter)
-                stats_df.sort_values(by='order',inplace=True, kind='mergesort ')
-                stats_df['order'] = stats_df['order'] + 1
-                stats_df.reset_index(inplace=True, drop=True)
-                        
-                return stats_df
-            return merge_closest(lineup_stats)
-        except ValueError:
-            return self.lineup
-    @staticmethod
-    def lineups():
-        path = json_path(name='team_lineups')
-        try:
-            with open(path) as file:
-                team_lineups = json.load(file)
-                file.close()
-            return team_lineups
-        except (FileNotFoundError, JSONDecodeError):
-            team_lineups = {}
-            for team in team_info.keys():
-                team_lineups[team] = {'L': [], 'R': []}
-            with open(path, "w+") as file:
-                json.dump(team_lineups, file)
-                file.close()
-            return team_lineups
     @cached_property
-    def opp_name(self):
-        try:
-            return self.next_game['gameData']['teams'][self.opp_ha]['teamName']
-        except TypeError:
-            return self.next_game_pk
+    def is_new_series(self):
+        if self.next_game_pk:
+            return self.future_games[0]['games'][0]['seriesGameNumber'] == 1
+        return self.next_game_pk     
+    @cached_property
+    def projected_ump(self):
+        def get_official(game,ump_type):
+            try:
+                officials = game['liveData']['boxscore']['officials']
+                projected_official = next(x for x in officials if x['officialType'] == ump_type)
+                return projected_official['official']['id']
+            except StopIteration:
+                return 'Unable to project umpire.'
+        if self.is_new_series:
+            return (get_official(self.last_game, 'First Base'))
+        elif self.next_game['liveData']['boxscore']['officials']:
+            return (get_official(self.next_game,'Home Plate'))
+        else:
+            return 'Unable to project umpire.'
+    @cached_property
+    def next_venue(self):
+        if self.next_game_pk:
+            return self.next_game['gameData']['venue']['id']
+        return self.next_game_pk
+    
+    @cached_property
+    def last_venue(self):
+        if self.last_game_pk:
+            return self.next_game['gameData']['venue']['id']
+        return self.last_game_pk
+    @cached_property
+    def home_venue(self):
+        return team_info[self.name]['venue']['id']
+            
+    @cached_property
+    def next_venue_data(self):
+        if self.next_game_pk:
+            return game_data[game_data['venue_id'] == self.next_venue]
+        return self.next_game_pk
+   
+    @cached_property
+    def last_venue_data(self):
+        if self.last_game_pk:
+            return game_data[game_data['venue_id'] == self.next_venue]
+        return self.next_game_pk
+    
+    @cached_property
+    def home_venue_data(self):
+        return game_data[game_data['venue_id'] == self.home_venue]
     @cached_property
     def weather(self):
-        try:
-            weather = self.next_game['gameData']['weather']
-            return weather
-        except TypeError:
-            return self.next_game_pk
-    
-    # def team_statcast():
-    #     return
-        
+        if self.next_game_pk:
+            return self.next_game['gameData']['weather']
+        return self.next_game_pk
+    @cached_property
+    def wind_speed(self):
+        avg_wind = self.next_venue_data['wind_speed'].mean()
+        if self.weather:
+            wind_description = self.weather.get('wind')
+            if wind_description:
+                try:
+                    return int(wind_description.split(' ')[0])
+                except (TypeError, ValueError):
+                    if not np.isnan(avg_wind):
+                        return avg_wind
+                    else:
+                        return game_data['wind_speed'].mean()
+            else:
+                if not np.isnan(avg_wind):
+                    return avg_wind
+                else:
+                    return game_data['wind_speed'].mean()
+        else:
+            if not np.isnan(avg_wind):
+                return avg_wind
+            else:
+                return game_data['wind_speed'].mean()
+    @cached_property
+    def wind_direction(self):
+        wind_direction = 'None'
+        if self.weather:
+            wind_description = self.weather.get('wind')
+            if wind_description:
+                return wind_description.split(', ')[-1]
+        return wind_direction
+    @cached_property
+    def venue_condition(self):
+        if self.weather:
+            condition = self.weather.get('condition')
+            if condition:
+                return condition
+            else:
+                try:
+                    return self.next_venue_data['condition'].mode().iloc[0]
+                except IndexError:
+                    if self.is_home == self.was_home and self.last_game_pk:
+                        try:
+                            return self.last_game['gameData']['weather']['condition']
+                        except KeyError:
+                            return game_data['condition'].mode().iloc[0]
+                    else:
+                        return game_data['condition'].mode().iloc[0]
+        else:
+            try:
+                return self.next_venue_data['condition'].mode().iloc[0]
+            except IndexError:
+                if self.is_home == self.was_home and self.last_game_pk:
+                    try:
+                        return self.last_game['gameData']['weather']['condition']
+                    except KeyError:
+                        return game_data['condition'].mode().iloc[0]
+                else:
+                    return game_data['condition'].mode().iloc[0]
 athletics = Team(mlb_id = 133, name = 'athletics')
 pirates = Team(mlb_id = 134, name = 'pirates')
 padres = Team(mlb_id = 135, name = 'padres')
@@ -571,10 +668,12 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
-from dfs_tools_mlb.compile.mlb import get_statcast_h
-test = get_statcast_h(663611,2020)
 
-test.columns.tolist()
-test['launchSpeed'].mean()   
+import numpy as np
+test = game_data.loc[(game_data['umpire'] == cubs.projected_ump), ['fd_points']].mean()['fd_points']
+np.isnan(test)
                     
-
+mets.venue_condition
+mets.weather
+# test = game_data[game_data['wind_speed'] == '1']
+# test['runs'].mode().iloc[0]
