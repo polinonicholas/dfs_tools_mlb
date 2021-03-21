@@ -1,7 +1,7 @@
 import pandas as pd
 from difflib import SequenceMatcher
 
-def sm_merge(df1, df2, columns=[], ratios=[], prefix='m_', reset_index=True, post_drop=True):
+def sm_merge(df1, df2, columns=[], ratios=[], prefix='m_', reset_index=True, post_drop=True, suffixes= ('_a', '_b')):
     df1_c = df1.copy()
     df2_c = df2.copy()
     if reset_index:
@@ -16,11 +16,11 @@ def sm_merge(df1, df2, columns=[], ratios=[], prefix='m_', reset_index=True, pos
                 df2_c.loc[index, merge_columns[0]] = col_1
             if SequenceMatcher(None, str(col_2), str(col_4)).ratio() >= ratios[1]:
                 df2_c.loc[index, merge_columns[1]] = col_2
-    df = pd.merge(df1_c, df2_c, on=merge_columns)
+    df = pd.merge(df1_c, df2_c, on=merge_columns, suffixes=suffixes)
     if post_drop:
         df.drop(columns=merge_columns, inplace=True)
     return df
-def sm_merge_arb(df1, df2, columns=[], ratios=[], prefix='m_', reset_index=True, post_drop=True):
+def sm_merge_arb(df1, df2, columns=[], ratios=[], prefix='m_', reset_index=True, post_drop=True, suffixes= ('_a', '_b')):
     df1_c = df1.copy()
     df2_c = df2.copy()
     if reset_index:
@@ -40,7 +40,7 @@ def sm_merge_arb(df1, df2, columns=[], ratios=[], prefix='m_', reset_index=True,
                 if SequenceMatcher(None,str(col_1),str(col_2)).ratio() >= ratios[flag]:
                     df2_c.loc[index, merge_columns[flag]] = col_1
         flag =+ 1
-    df = pd.merge(df1_c, df2_c, on=merge_columns)
+    df = pd.merge(df1_c, df2_c, on=merge_columns, suffixes=suffixes)
     if post_drop:
         df.drop(columns=merge_columns, inplace=True)
     return df

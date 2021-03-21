@@ -19,5 +19,3 @@ def get_driver_options(driver_name, driver_profile, use_profile):
 				options.add_argument(settings.driver_settings['profile_target'])
 	return options
 
-# driver = webdriver.Chrome(executable_path=get_driver_path(), options=get_driver_options())
-

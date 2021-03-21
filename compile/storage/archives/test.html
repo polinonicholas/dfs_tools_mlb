@@ -1,0 +1,682 @@
+<div data-section-id="tag/stats" id="tag/stats" class="sc-ifAKCX dluJDj"><div class="sc-gzVnrw eesUPo"><div class="sc-bxivhb cjtbAK"><h1 class="sc-htoDjs WxWXp"><a class="sc-VigVT kGvRyb" href="#tag/stats"></a>stats</h1></div></div><div class="sc-bxivhb cjtbAK"><div class="sc-jWBwVP redoc-markdown  sc-iRbamj flfxUM"><p>The stats endpoint on the Stats API allows for users to request biographical and statistical information from the MLB database pertaining to players.   </p>
+<ul>
+<li><p>Used For: </p>
+<ul>
+<li><a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;playerPool=All">Hitting</a>,<a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=pitching&amp;playerPool=All">Pitching</a> or <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=fielding&amp;playerPool=All">Fielding</a> stats for all players in a sport. </li>
+</ul>
+</li>
+<li><p>Best Practices: </p>
+<ul>
+<li>Use playerPool "All" to recreate lookup cur_hitting/cur_fielding/cur_pitching. </li>
+<li>The API is limited to displaying 1000 returns for each call, use the offset and limit parameter to paginate efficently through the data. </li>
+<li>Use statType=statSplits and sitCodes="sitCode desired" for Stat Splits. </li>
+<li>playerPool defaults to "Qualified".</li>
+<li>Use the stats/metrics endpoint for Statcast statistics on both a league and player level.</li>
+<li>Hydrate multiple stats via the "person" hydration.</li>
+<li>For Mexican league information use .1, .2 year values for all seasons before 2019 (Ie. 2018.1,2018.2)</li>
+<li>Pull Statcast metrics for individual plays and players in specific venue by adding venueId</li>
+</ul>
+</li>
+</ul>
+</div></div></div>
+<div data-section-id="operation/stats" id="operation/stats" class="sc-ifAKCX hiuczA"><div class="sc-gzVnrw sc-ibxdXY bSFXlp"><div class="sc-bxivhb cjtbAK"><h2 class="sc-dnqmqq ioYTqA"><a class="sc-VigVT kGvRyb" href="#operation/stats"></a>View standard statistics. </h2><div class="sc-RefOD boajtD"><div class="sc-jWBwVP sc-iRbamj flfxUM"><p><strong>Description:</strong>
+ This endpoint returns standard statistics.</p>
+<p> <strong>Return Includes:</strong> Team, league, player statistics.</p>
+<p> <strong>Required Parameters:</strong> stats and group are required to run this call.</p>
+<p> <strong>Hydrations:</strong> This endpoint can accept the hydrations query parameter. </p>
+<hr>
+<p> <strong>Example of call with required parameters</strong> </p>
+<p>   <a href="https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting">https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting</a></p>
+</div></div><div><h5 class="sc-gqjmRU LiUBH">query Parameters</h5><table class="sc-dxgOiQ eCjbJc"><tbody><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="stats"><span class="sc-kGXeez bcLONg"></span>stats<div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert statType to return statistics for a players for a given sportId. </p>
+<ol>
+<li>Insert statType:  <a href="https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;sportId=1">https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;sportId=1</a> </li>
+</ol>
+<p><strong>Find available stat types at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p><strong>For a list of all sportIds <a href="https://statsapi.mlb.com/api/v1/sports">https://statsapi.mlb.com/api/v1/sports</a></strong></p>
+<ul>
+<li>Notes for playLog, the playLog statType has available hydrations <ol>
+<li>hitData: launchSpeed,launchAngle,etc</li>
+<li>pitchData:  startSpeed, strikeZoneTop, strikeZoneBottom, etc</li>
+</ol>
+</li>
+</ul>
+<ol>
+<li>One Hydration: <a href="http://statsapi.mlb.com/api/v1/people/518516/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;hydrate=hitData">http://statsapi.mlb.com/api/v1/people/518516/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;hydrate=hitData</a></li>
+<li>Multiple Hydration: <a href="http://statsapi.mlb.com/api/v1/people/518516/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;hydrate=hitData,pitchData">http://statsapi.mlb.com/api/v1/people/518516/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;hydrate=hitData,pitchData</a></li>
+</ol>
+<ul>
+<li>Notes for populating different stat outputs for all players in both MLB &amp; MiLB. The API defaults to a limit of 1000 returns in each call. The total for the entire return will appear via the "totalSplits" object. Use a large limit to match the totalSplits number or offset and limit to navigate through all of the data. Either workflow is efficient. </li>
+</ul>
+<ol>
+<li><p>MLB Season Stats: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=all&amp;limit=5000">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=all&amp;limit=5000</a></p>
+</li>
+<li><p>MiLB Season Stats: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=12&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=alloffset=100&amp;limit=1000">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=12&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=alloffset=100&amp;limit=1000</a> </p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong></p>
+</li>
+<li><p>One Stat Split: <a href="http://statsapi.mlb.com/api/v1/stats?stats=statSplits&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=all&amp;sitCodes=h&amp;limit=5000">http://statsapi.mlb.com/api/v1/stats?stats=statSplits&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=all&amp;sitCodes=h&amp;limit=5000</a></p>
+</li>
+<li><p>Multiple Stat Splits: <a href="http://statsapi.mlb.com/api/v1/stats?stats=statSplits&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=all&amp;sitCodes=a,h&amp;offset=1000&amp;limit=1000">http://statsapi.mlb.com/api/v1/stats?stats=statSplits&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;order=asc&amp;playerPool=all&amp;sitCodes=a,h&amp;offset=1000&amp;limit=1000</a>        </p>
+<p>   <strong>List of sitCodes can be found at <a href="https://statsapi.mlb.com/api/v1/situationCodes">https://statsapi.mlb.com/api/v1/situationCodes</a></strong>          </p>
+</li>
+<li><p>MLB stats by Date Range: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;type=byDateRange&amp;order=asc&amp;playerPool=all&amp;offset=100&amp;limit=1000&amp;startDate=05/17/2018&amp;endDate=05/21/2018">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;type=byDateRange&amp;order=asc&amp;playerPool=all&amp;offset=100&amp;limit=1000&amp;startDate=05/17/2018&amp;endDate=05/21/2018</a></p>
+</li>
+<li><p>MiLB stats by Date Range: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=12&amp;season=2018&amp;group=hitting&amp;type=byDateRange&amp;order=asc&amp;playerPool=all&amp;offset=100&amp;limit=1000&amp;startDate=05/17/2018&amp;endDate=05/21/2018">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=12&amp;season=2018&amp;group=hitting&amp;type=byDateRange&amp;order=asc&amp;playerPool=all&amp;offset=100&amp;limit=1000&amp;startDate=05/17/2018&amp;endDate=05/21/2018</a></p>
+</li>
+</ol>
+<ul>
+<li>Notes for individual events for playLog, playlog can be filered by individual events</li>
+</ul>
+<ol>
+<li><p>One event for a given player: <a href="http://statsapi.mlb.com/api/v1/people/514888/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;eventType=single">http://statsapi.mlb.com/api/v1/people/514888/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;eventType=single</a></p>
+</li>
+<li><p>Multiple events for a given player: <a href="http://statsapi.mlb.com/api/v1/people/514888/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;eventType=single,double">http://statsapi.mlb.com/api/v1/people/514888/stats?stats=playLog&amp;group=hitting&amp;season=2018&amp;eventType=single,double</a>  </p>
+<p>   <strong>List of eventTypes can be found at <a href="https://statsapi.mlb.com/api/v1/eventTypes">https://statsapi.mlb.com/api/v1/eventTypes</a></strong>          </p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="playerPool"><span class="sc-kGXeez bcLONg"></span>playerPool</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>There are 4 different types of playerPools to return statistics for a particular playerPool across a sport. </p>
+<p>Use "ALL" for the APIequivalent of lookup cur_hitting/cur_pitching/cur_fielding    </p>
+<ol>
+<li>Insert All:  <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=All">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=All</a></li>
+<li>Insert Qualified: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=Qualified">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=Qualified</a></li>
+<li>Insert Rookies: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=Rookies">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=Rookies</a></li>
+<li>Insert Qualified Rookies: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=Qualified_rookies">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;playerPool=Qualified_rookies</a>           </li>
+<li>Insert Multiple sportIds and groups: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1,11,12,13,14,15,16&amp;season=2018&amp;group=hitting,pitching&amp;playerPool=All">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1,11,12,13,14,15,16&amp;season=2018&amp;group=hitting,pitching&amp;playerPool=All</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="position"><span class="sc-kGXeez bcLONg"></span>position</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div><div><span class="sc-cHGsZl lpeYvY"> Enum:</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"P"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"C"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"1B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"2B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"3B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"SS"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"CF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"DH"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"PH"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"PR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"BR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"OF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"IF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"SP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"CP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"UT"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"UI"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"UO"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RHP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LHP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RHS"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LHS"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LHR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RHR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"X"</span> </div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert position to return statistics for a given position. Default to "Qualified" playerPool </p>
+<ol>
+<li><p>Insert position: <a href="https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;position=3B">https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;position=3B</a></p>
+<p><strong>Find available positions at <a href="https://statsapi.mlb.com/api/v1/positions">https://statsapi.mlb.com/api/v1/positions</a></strong></p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="teamId"><span class="sc-kGXeez bcLONg"></span>teamId</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert teamId to return statistics for a given team. Default to "Qualified" playerPool </p>
+<ol>
+<li>Insert teamId: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;teamId=140">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;teamId=140</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="leagueId"><span class="sc-kGXeez bcLONg"></span>leagueId</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert leagueId to return statistics for a given team. Default to "Qualified" playerPool </p>
+<ol>
+<li>Insert leagueId: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;leagueId=104">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;leagueId=104</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="limit"><span class="sc-kGXeez bcLONg"></span>limit</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a limit to limit return. </p>
+<ol>
+<li>Insert limit:  <a href="https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;position=3B&amp;playerPool=Qualified&amp;limit=2">https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;position=3B&amp;playerPool=Qualified&amp;limit=2</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="offset"><span class="sc-kGXeez bcLONg"></span>offset</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert an offset to returns i+1 as the first record in the set of players. The example below returns the top 2 &amp; 3 batting average leaders among all qualified third basemen.</p>
+<ol>
+<li>Insert offset: <a href="https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;position=3B&amp;playerPool=Qualified&amp;limit=2&amp;offset=1&amp;sortStat=battingAverage">https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;position=3B&amp;playerPool=Qualified&amp;limit=2&amp;offset=1&amp;sortStat=battingAverage</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="group"><span class="sc-kGXeez bcLONg"></span>group<div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert statGroup to return statistics for a given sport or league based on group. Default to "Qualified" playerPool </p>
+<ol>
+<li>Insert statGroup:  <a href="https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting">https://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting</a> </li>
+</ol>
+<p>Find available stat types at <a href="https://statsapi.mlb.com/api/v1/statGroup">https://statsapi.mlb.com/api/v1/statGroup</a></p>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="gameType"><span class="sc-kGXeez bcLONg"></span>gameType</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert gameType to return statistics for a given sport or league based on gameType. Default to "Qualified" playerPool </p>
+<ol>
+<li>Insert gameType:  <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018</a> </li>
+</ol>
+<p>Find available gameType at <a href="https://statsapi.mlb.com/api/v1/gameTypes">https://statsapi.mlb.com/api/v1/gameTypes</a></p>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="season"><span class="sc-kGXeez bcLONg"></span>season</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert year to return statistics for a particular season. Default to "Qualified" playerPool    </p>
+<ol>
+<li>Insert year:  <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="sportIds"><span class="sc-kGXeez bcLONg"></span>sportIds</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert sportId to return statistics for a given sport.  </p>
+<ol>
+<li>Insert sportId: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;sportIds=11">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;sportIds=11</a></li>
+<li>Insert multiple sportIds: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;sportIds=1,11">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;sportIds=1,11</a></li>
+</ol>
+<p>For a list of all sportIds: <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></p>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="sortStat"><span class="sc-kGXeez bcLONg"></span>sortStat</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Sort return based on stat. </p>
+<p>Default to "Qualified" playerPool    </p>
+<ol>
+<li>Insert stat:  <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;playerPool=Qualified&amp;hydrate=person">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;playerPool=Qualified&amp;hydrate=person</a></li>
+</ol>
+<p>For a list of all availbale stats: <a href="https://statsapi.mlb.com/api/v1/baseballStats">https://statsapi.mlb.com/api/v1/baseballStats</a></p>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="order"><span class="sc-kGXeez bcLONg"></span>order</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>order return based on either desc or asc. </p>
+<p>Default to "Qualified" playerPool    </p>
+<ol>
+<li>Insert stat:  <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person</a></li>
+</ol>
+<p>For a list of all availbale stats: <a href="https://statsapi.mlb.com/api/v1/baseballStats">https://statsapi.mlb.com/api/v1/baseballStats</a></p>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="hydrate"><span class="sc-kGXeez bcLONg"></span>hydrate</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert Hydration(s) to return data for any available stats hydration. The hydrations for Stats contain "person" and "team" which have subhydrations Format "team(subHydration1, subHydrations2)" "</p>
+<ol>
+<li><p>One Hydration Using Team Sub Hydration: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league)">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league)</a></p>
+</li>
+<li><p>Multiple Hydrations Using Team Sub Hydration: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league,social)">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league,social)</a></p>
+</li>
+<li><p>Multiple Hydrations Using Team &amp; Stat Sub Hydrations: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(transactions),team(league)">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(transactions),team(league)</a></p>
+<ul>
+<li><p>Available Hydrations:</p>
+<ol>
+<li><p>person</p>
+<ul>
+<li>Hydrations Available Through Person <ol>
+<li>hydrations</li>
+<li>awards</li>
+<li>currentTeam</li>
+<li>team</li>
+<li>rosterEntries</li>
+<li>relatives</li>
+<li>transactions</li>
+<li>social</li>
+<li>education</li>
+<li>stats</li>
+<li>draft</li>
+<li>mixedFeed</li>
+<li>articles</li>
+<li>videos</li>
+<li>xrefId</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><p>team</p>
+<ul>
+<li>Hydrations Available Through Team <ol>
+<li>hydrations</li>
+<li>previousSchedule</li>
+<li>nextSchedule</li>
+<li>venue</li>
+<li>springVenue</li>
+<li>social</li>
+<li>deviceProperties</li>
+<li>game(promotions)</li>
+<li>game(promotions)</li>
+<li>game(atBatPromotions)</li>
+<li>game(tickets)</li>
+<li>game(atBatTickets)</li>
+<li>game(sponsorships)</li>
+<li>league</li>
+<li>videos</li>
+<li>person</li>
+<li>sport</li>
+<li>standings</li>
+<li>division  </li>
+<li>xref</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+<ul>
+<li><p>Notes on "currentTeam" hydration</p>
+<p> When hydrating for "currentTeam" users can use the 'appContext' parameter to specify most recent team by league</p>
+<ol>
+<li>Most Recent Major League Team: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(appContext=majorLeague,currentTeam)%3A%29">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(appContext=majorLeague,currentTeam)%3A%29</a></li>
+<li>Most Recent Minor League Team: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(appContext=minorLeague,currentTeam)%3A%29">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportId=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(appContext=minorLeague,currentTeam)%3A%29</a></li>
+</ol>
+</li>
+</ul>
+</div></div></div></td></tr><tr class="last undefined"><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="fields"><span class="sc-kGXeez bcLONg"></span>fields</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Comma delimited list of specific fields to be returned. Format: topLevelNode, childNode, attribute</p>
+<p>Example: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;fields=stats,type,splits,season,stat,homeruns,player,fullName">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;group=hitting&amp;gameType=R&amp;season=2018&amp;fields=stats,type,splits,season,stat,homeruns,player,fullName</a></p>
+</div></div></div></td></tr></tbody></table></div><div><h3 class="sc-eXEjpC espozG"> Responses </h3><div><div class="sc-kPVwWT fDvFMp"><svg class="sc-jTzLTM NifDa" version="1.1" viewBox="0 0 24 24" x="0" xmlns="http://www.w3.org/2000/svg" y="0"><polygon points="17.3 8.3 12 13.6 6.7 8.3 5.3 9.7 12 16.4 18.7 9.7 "></polygon></svg><strong>200 </strong><span class="sc-jlyJG evvbxn"><p>OK</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>401 </strong><span class="sc-jlyJG evvbxn"><p>Unauthorized</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>403 </strong><span class="sc-jlyJG evvbxn"><p>Forbidden</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>404 </strong><span class="sc-jlyJG evvbxn"><p>Not Found</p>
+</span></div></div></div></div><div class="sc-EHOje sc-bZQynM dtUibw"><div class="sc-kTUwUJ ldTMcP"><div class="sc-gxMtzJ dHLKeu"><span class="sc-dfVpRl http-verb get jBjYbV" type="get"> get</span> <span class="sc-dqBHgY iENVAs">/v1/stats</span><svg class="sc-jTzLTM OtKQc" version="1.1" viewBox="0 0 24 24" x="0" xmlns="http://www.w3.org/2000/svg" y="0" style="margin-right: -25px;"><polygon points="17.3 8.3 12 13.6 6.7 8.3 5.3 9.7 12 16.4 18.7 9.7 "></polygon></svg></div><div class="sc-gzOgki lkvpfX"><div class="sc-iyvyFf eftLSo"><div class="sc-jWBwVP sc-iRbamj gDsWLk"></div><div><div class="sc-hwwEjo bwgXFh"><span>https://statsapi.mlb.com/api</span>/v1/stats</div></div></div></div></div></div></div></div>
+<div data-section-id="operation/leaders" id="operation/leaders" class="sc-ifAKCX hiuczA"><div class="sc-gzVnrw sc-ibxdXY bSFXlp"><div class="sc-bxivhb cjtbAK"><h2 class="sc-dnqmqq ioYTqA"><a class="sc-VigVT kGvRyb" href="#operation/leaders"></a>View leaders for a statistic. </h2><div class="sc-RefOD boajtD"><div class="sc-jWBwVP sc-iRbamj flfxUM"><p><strong>Description:</strong>
+ This endpoint returns statistical data for top performers  information based on League Leader Categories.</p>
+<p> <strong>Return Includes:</strong> Player biographical and statistical information.</p>
+<p> <strong>Required Parameters:</strong> leaderCategories is required to run this call.</p>
+<p> <strong>Hydrations:</strong> This endpoint can accept the hydrations query parameter. </p>
+<hr>
+<p> <strong>Example of call with required parameters</strong></p>
+<p><a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns</a></p>
+<hr>
+<p> <strong>Example of call with hydration parameters</strong></p>
+<p> <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=team">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=team</a></p>
+</div></div><div><h5 class="sc-gqjmRU LiUBH">query Parameters</h5><table class="sc-dxgOiQ eCjbJc"><tbody><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="leaderCategories"><span class="sc-kGXeez bcLONg"></span>leaderCategories<div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a league leader category to return information  and ranking for a particular statistic.</p>
+<ol>
+<li><p>Insert leaderCategory:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns</a></p>
+<p>For  a list of all leaderCategories:  <a href="https://statsapi.mlb.com/api/v1/leagueLeaderTypes">https://statsapi.mlb.com/api/v1/leagueLeaderTypes</a></p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="playerPool"><span class="sc-kGXeez bcLONg"></span>playerPool</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>There are 4 different types of playerPools to return statistics for a particular playerPool across a sport. </p>
+<p>Use "ALL" for the APIequivalent of lookup cur_hitting/cur_pitching/cur_fielding    </p>
+<ol>
+<li>Insert All:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;leagueId=104&amp;playerPool=All">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;leagueId=104&amp;playerPool=All</a></li>
+<li>Insert Qualified: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;playerPool=Qualified">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;playerPool=Qualified</a></li>
+<li>Insert Rookies: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;playerPool=Rookies">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;playerPool=Rookies</a></li>
+<li>Insert Qualified Rookies: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;playerPool=Qualified_rookies">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;season=2018&amp;playerPool=Qualified_rookies</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="leaderGameTypes"><span class="sc-kGXeez bcLONg"></span>leaderGameTypes</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a game type to return information  and ranking for a particular statistic in a particular game type.</p>
+<ol>
+<li><p>Insert gameType:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R</a></p>
+<p>For a list of all gameTypes: <a href="https://statsapi.mlb.com/api/v1/gameTypes">https://statsapi.mlb.com/api/v1/gameTypes</a></p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="sitCodes"><span class="sc-kGXeez bcLONg"></span>sitCodes</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a sitCode to return information  and ranking for a particular statistic in a particular game type.</p>
+<ol>
+<li><p>Insert sitCode:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sitCodes=4">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sitCodes=4</a></p>
+<p>For a list of all sitCodes: <a href="https://statsapi.mlb.com/api/v1/situationCodes">https://statsapi.mlb.com/api/v1/situationCodes</a></p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="position"><span class="sc-kGXeez bcLONg"></span>position</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div><div><span class="sc-cHGsZl lpeYvY"> Enum:</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"P"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"C"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"1B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"2B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"3B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"SS"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"CF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"DH"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"PH"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"PR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"BR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"OF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"IF"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"SP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"CP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"UT"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"UI"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"UO"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RHP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LHP"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RHS"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LHS"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"LHR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"RHR"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"B"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"X"</span> </div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert position to return statistics for a given position. Default to "Qualified" playerPool </p>
+<ol>
+<li><p>Insert position: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;position=1B">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;position=1B</a></p>
+<p><strong>Find available positions at <a href="https://statsapi.mlb.com/api/v1/positions">https://statsapi.mlb.com/api/v1/positions</a></strong></p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="statGroup"><span class="sc-kGXeez bcLONg"></span>statGroup</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a stat group to return information  and ranking for a particular statistic in a particular group.</p>
+<ol>
+<li><p>Insert statGroup:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018</a></p>
+<p>For a list of all statGroups: <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></p>
+</li>
+</ol>
+<ul>
+<li><p>Best practice to request all time stat leaders:</p>
+<p>When requesting for all time leaders in a particular stat, it is best practices to include</p>
+<ul>
+<li>statType=statsSingleseason</li>
+<li>statGroup</li>
+<li>leaderGameTypes</li>
+<li>leaderCategories</li>
+</ul>
+<ol>
+<li>All time leaders in assists: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?statType=statsSingleSeason&amp;statGroup=fielding&amp;limit=10&amp;sportId=1&amp;leaderGameTypes=R&amp;leaderCategories=assists&amp;season=2018">https://statsapi.mlb.com/api/v1/stats/leaders?statType=statsSingleSeason&amp;statGroup=fielding&amp;limit=10&amp;sportId=1&amp;leaderGameTypes=R&amp;leaderCategories=assists&amp;season=2018</a></li>
+</ol>
+</li>
+</ul>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="season"><span class="sc-kGXeez bcLONg"></span>season<div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert year to return information  and ranking for a particular statistic in a given year. </p>
+<ol>
+<li>Insert year: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="leagueId"><span class="sc-kGXeez bcLONg"></span>leagueId</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert leagueId to return statistics for a given team. Default to "Qualified" playerPool </p>
+<ol>
+<li>Insert leagueId: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=1&amp;leagueId=104&amp;season=2018">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=1&amp;leagueId=104&amp;season=2018</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="startDate"><span class="sc-kGXeez bcLONg"></span>startDate</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">LocalDate</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert date to return a directory of attendance metrics for a particular date range. Format:
+ MM/DD/YYYY</p>
+<p><strong>startDate must be coupled with endDate and byDateRange statType</strong></p>
+<ol>
+<li>Insert date range: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;startDate=06/01/2018&amp;endDate=06/15/2018&amp;season=2018&amp;statType=byDateRange">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;startDate=06/01/2018&amp;endDate=06/15/2018&amp;season=2018&amp;statType=byDateRange</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="endDate"><span class="sc-kGXeez bcLONg"></span>endDate</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">LocalDate</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert date to return a directory of attendance metrics for a particular date range. Format:
+ MM/DD/YYYY</p>
+<p><strong>endDate must be coupled with startDate and byDateRange statType</strong></p>
+<ol>
+<li>Insert date range: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;startDate=06/01/2018&amp;endDate=06/15/2018&amp;season=2018&amp;statType=byDateRange">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;startDate=06/01/2018&amp;endDate=06/15/2018&amp;season=2018&amp;statType=byDateRange</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="sportId"><span class="sc-kGXeez bcLONg"></span>sportId</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a sportId to return information  and ranking for a particular statistic in a given sport.</p>
+<ol>
+<li><p>Insert sportId:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018</a></p>
+<p>For  a list of all sportIds:  <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a>      </p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="hydrate"><span class="sc-kGXeez bcLONg"></span>hydrate</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert Hydration(s) to return data for any available stats hydration. The hydrations for Stats contain "person" and "team" which have subhydrations Format "team(subHydration1, subHydrations2)" "           </p>
+<ol>
+<li><p>One Hydration Using Team Sub Hydration: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=team(league)">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=team(league)</a></p>
+</li>
+<li><p>Multiple Hydrations Using Team Sub Hydration:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameType=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=team(league,social)">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameType=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=team(league,social)</a></p>
+</li>
+<li><p>Multiple Hydrations Using Team &amp; Stat Sub Hydrations:  <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameType=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=person(transactions),team(league)">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameType=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=person(transactions),team(league)</a></p>
+</li>
+<li><p>Check For Available Hydrations: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=hydrations">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;leaderGameTypes=R&amp;statGroups=hitting&amp;season=2018&amp;hydrate=hydrations</a></p>
+<ul>
+<li><p>Available Hydrations:</p>
+<ol>
+<li><p>person</p>
+<ul>
+<li>Hydrations Available Through Person <ol>
+<li>hydrations</li>
+<li>awards</li>
+<li>currentTeam</li>
+<li>team</li>
+<li>rosterEntries</li>
+<li>relatives</li>
+<li>transactions</li>
+<li>social</li>
+<li>education</li>
+<li>stats</li>
+<li>draft</li>
+<li>mixedFeed</li>
+<li>articles</li>
+<li>videos</li>
+<li>xrefId</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><p>team</p>
+<ul>
+<li>Hydrations Available Through Team <ol>
+<li>hydrations</li>
+<li>previousSchedule</li>
+<li>nextSchedule</li>
+<li>venue</li>
+<li>springVenue</li>
+<li>social</li>
+<li>deviceProperties</li>
+<li>game(promotions)</li>
+<li>game(promotions)</li>
+<li>game(atBatPromotions)</li>
+<li>game(tickets)</li>
+<li>game(atBatTickets)</li>
+<li>game(sponsorships)</li>
+<li>league</li>
+<li>videos</li>
+<li>person</li>
+<li>sport</li>
+<li>standings</li>
+<li>division  </li>
+<li>xref</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+</li>
+<li><p>Notes on "currentTeam" hydration:</p>
+</li>
+</ul>
+<p>When hydrating for "currentTeam" users can use the 'appContext' parameter to specify most recent team by league</p>
+<ol>
+<li>Most Recent Major League Team: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=person(appContext=majorLeague,currentTeam)">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=person(appContext=majorLeague,currentTeam)</a></li>
+<li>Most Recent Minor League Team: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=person(appContext=minorLeague,currentTeam)">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=person(appContext=minorLeague,currentTeam)</a></li>
+</ol>
+<ul>
+<li>Notes on Stat Hydrations</li>
+</ul>
+<p>Best practice for MLB stat hydrations, use person(stats(group=["statGroup1","statGroup2"],type=["statType1","statType2"])). </p>
+<ol>
+<li><p>Hydrating one stat: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bcareer%5D)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting],type=[career])%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,yearByYear%5D)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,yearByYear])%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MLB individual stat hydrations, use person(stats(group=["statGroup1","statGroup2"],type=["statType1","statType2"],season="year")). </p>
+<ol>
+<li><p>Hydrating one stat: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bseason%5D,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting],type=[season],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bseason,seasonAdvanced%5D,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],season=2018)%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong>     </p>
+</li>
+</ol>
+<p>Best practice for MiLB stat hydrations, use person(stats(group=["statGroup1,statGroup2"],type=["statType1","statType2],sportId="MiLB Id")). </p>
+<ol>
+<li><p>Hydrating one stat: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bcareer%5D,sportId=12)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=[hitting],type=[career],sportId=12)%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,yearByYear%5D,sportId=12)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,yearByYear],sportId=12)%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of sportIds can be found at <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MiLB individual stat hydrations, use person(stats(group=["statGroup1,statGroup2"],type=["statType1","statType2],sportId="MiLB Id")). </p>
+<ol>
+<li><p>Hydrating one stat: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;sportId=12&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bseason%5D,sportId=12,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;sportId=12&amp;hydrate=person(stats(group=[hitting],type=[season],sportId=12,season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bseason,seasonAdvanced%5D,sportId=12,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],sportId=12,season=2018)%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of sportIds can be found at <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong>                      </p>
+</li>
+</ol>
+<p>Best practice for season stats in date range, use person(stats(group=["statGroup1","statGroup2"],type=["byDateRange"]startDate="mm/dd/yyyy",endDate="mm/dd/yyyy",season="year")).  </p>
+<ol>
+<li><p>Hydrating byDateRange stat: <a href="http://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5BbyDateRange%5D,startDate=05/17/2018,endDate=05/21/2018,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[byDateRange],startDate=05/17/2018,endDate=05/21/2018,season=2018)%3A%29</a></p>
+<p> <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p> <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong>                       </p>
+</li>
+</ol>
+<p>Best practice for limiting playLog &amp; pitchLog, use stats(group=["statGroup1","statGroup2"],type=["playLog"],limit=1,season="year").  </p>
+<ol>
+<li><p>Limiting playLog: <a href="http://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5BplayLog%5D,limit=1,season=2017)%3A%29">http://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[playLog],limit=1,season=2017)%3A%29</a></p>
+</li>
+<li><p>Limiting pitchLog: <a href="http://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5BpitchLog%5D,limit=1,season=2017)%3A%29">http://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[pitchLog],limit=1,season=2017)%3A%29</a></p>
+<p>  <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>  <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong> </p>
+</li>
+</ol>
+<p>Best practice for metrics in stat hydrations, use person(stats(type=[metricAverages],metrics=[launchSpeed],season="year")) or person(stats(type=[metricLog],metrics=[launchSpeed],season="year")). </p>
+<ol>
+<li><p>Hydrating one metric with metricAverages: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=%5BmetricAverages%5D,metrics=%5BlaunchSpinRate%5D,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=[metricAverages],metrics=[launchSpinRate],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple metrics with metricAverages: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=%5BbyMonth,metricAverages%5D,metrics=%5BlaunchSpeed,launchSpinRate%5D,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=[byMonth,metricAverages],metrics=[launchSpeed,launchSpinRate],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one metric with metricLog: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=%5BmetricLog,metrics=launchSpinRate,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=[metricLog,metrics=launchSpinRate,season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple metrics with metricLog: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=%5BbyMonth,metricLog%5D,metrics=%5BlaunchSpeed,launchSpinRate%5D,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(type=[byMonth,metricLog],metrics=[launchSpeed,launchSpinRate],season=2018)%3A%29</a></p>
+<p><strong>List of metrics can be found at <a href="https://statsapi.mlb.com/api/v1/metrics">https://statsapi.mlb.com/api/v1/metrics</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MLB sitCodes in stat hydrations, use person(stats(type=[statSplits],sitCodes=[h,a],season="year")). </p>
+<ol>
+<li><p>Hydrating one sitCode: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,statSplits%5D,sitCodes=a,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,statSplits],sitCodes=a,season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple sitCodes: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,statSplits%5D,sitCodes=%5Ba,h%5D,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,statSplits],sitCodes=[a,h],season=2018)%3A%29</a></p>
+<p><strong>List of sitCodes can be found at <a href="https://statsapi.mlb.com/api/v1/situationCodes">https://statsapi.mlb.com/api/v1/situationCodes</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MiLB sitCodes in stat hydrations, use person(stats(type=statSplits,sitCodes=[h,a],season=2018,sportId = "MiLB Id",season="year")). </p>
+<ol>
+<li><p>Hydrating on sitCode: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;&amp;sportId=12&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,statSplits%5D,sitCodes=a,sportId=12,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;season=2018&amp;&amp;sportId=12&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,statSplits],sitCodes=a,sportId=12,season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple sitCodes: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,statSplits%5D,sitCodes=%5Ba,h%5D,sportId=12,season=2018)%3A%29">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;&amp;sportId=12&amp;season=2018&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,statSplits],sitCodes=[a,h],sportId=12,season=2018)%3A%29</a></p>
+<p><strong>List of sitCodes can be found at <a href="https://statsapi.mlb.com/api/v1/situationCodes">https://statsapi.mlb.com/api/v1/situationCodes</a></strong> </p>
+<p><strong>List of sportIds can be found at <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></strong>            </p>
+</li>
+</ol>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="limit"><span class="sc-kGXeez bcLONg"></span>limit</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a limit to limit return.</p>
+<ol>
+<li>Insert limit: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=person(stats(type=season,season=2018),education),hydrations,team(league)&amp;limit=1">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;hydrate=person(stats(type=season,season=2018),education),hydrations,team(league)&amp;limit=1</a></li>
+</ol>
+</div></div></div></td></tr><tr class="last undefined"><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="fields"><span class="sc-kGXeez bcLONg"></span>fields</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Comma delimited list of specific fields to be returned. Format: topLevelNode, childNode, attribute</p>
+<p>Example: <a href="https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;fields=leagueLeaders,leaders,person,fullName">https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&amp;fields=leagueLeaders,leaders,person,fullName</a></p>
+</div></div></div></td></tr></tbody></table></div><div><h3 class="sc-eXEjpC espozG"> Responses </h3><div><div class="sc-kPVwWT fDvFMp"><svg class="sc-jTzLTM NifDa" version="1.1" viewBox="0 0 24 24" x="0" xmlns="http://www.w3.org/2000/svg" y="0"><polygon points="17.3 8.3 12 13.6 6.7 8.3 5.3 9.7 12 16.4 18.7 9.7 "></polygon></svg><strong>200 </strong><span class="sc-jlyJG evvbxn"><p>OK</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>401 </strong><span class="sc-jlyJG evvbxn"><p>Unauthorized</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>403 </strong><span class="sc-jlyJG evvbxn"><p>Forbidden</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>404 </strong><span class="sc-jlyJG evvbxn"><p>Not Found</p>
+</span></div></div></div></div><div class="sc-EHOje sc-bZQynM dtUibw"><div class="sc-kTUwUJ ldTMcP"><div class="sc-gxMtzJ dHLKeu"><span class="sc-dfVpRl http-verb get jBjYbV" type="get"> get</span> <span class="sc-dqBHgY iENVAs">/v1/stats/leaders</span><svg class="sc-jTzLTM OtKQc" version="1.1" viewBox="0 0 24 24" x="0" xmlns="http://www.w3.org/2000/svg" y="0" style="margin-right: -25px;"><polygon points="17.3 8.3 12 13.6 6.7 8.3 5.3 9.7 12 16.4 18.7 9.7 "></polygon></svg></div><div class="sc-gzOgki lkvpfX"><div class="sc-iyvyFf eftLSo"><div class="sc-jWBwVP sc-iRbamj gDsWLk"></div><div><div class="sc-hwwEjo bwgXFh"><span>https://statsapi.mlb.com/api</span>/v1/stats/leaders</div></div></div></div></div></div></div></div>
+<div data-section-id="operation/getStreaks" id="operation/getStreaks" class="sc-ifAKCX hiuczA"><div class="sc-gzVnrw sc-ibxdXY bSFXlp"><div class="sc-bxivhb cjtbAK"><h2 class="sc-dnqmqq ioYTqA"><a class="sc-VigVT kGvRyb" href="#operation/getStreaks"></a>View statistical streaks for a given season </h2><div class="sc-RefOD boajtD"><div class="sc-jWBwVP sc-iRbamj flfxUM"><p><strong>Description:</strong>
+ This endpoint returns statistical streaks based on streakType,streakSpan,gameType,season, &amp; sportId.</p>
+<p> <strong>Return Includes:</strong> biographical and statistical information for a group of players.</p>
+<p> <strong>Required Parameters:</strong> streakType,streakSpan,gameType,season, sportId &amp; limit </p>
+<p> <strong>Hydrations:</strong> This endpoint can accept the hydrations query parameter. </p>
+<hr>
+<p> <strong>Example of call with hydration parameters</strong></p>
+<p> <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=season&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(type=season,season=2018)">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=season&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(type=season,season=2018)</a>)     </p>
+</div></div><div><h5 class="sc-gqjmRU LiUBH">query Parameters</h5><table class="sc-dxgOiQ eCjbJc"><tbody><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="streakType"><span class="sc-kGXeez bcLONg"></span>streakType<div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div><div><span class="sc-cHGsZl lpeYvY"> Enum:</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"hittingStreakOverall"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"hittingStreakHome"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"hittingStreakAway"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"onBaseOverall"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"onBaseHome"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"onBaseAway"</span> </div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert streakType to return streak information for player in a particular season. </p>
+<ol>
+<li>Insert streakType: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=season&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=season&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field"><span class="sc-kGXeez bcLONg"></span><div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div><div><span class="sc-cHGsZl lpeYvY"> Enum:</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"career"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"season"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"currentStreak"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"currentStreakInSeason"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"notable"</span> <span class="sc-cHGsZl sc-jbKcbu kTVySD">"notableInSeason"</span> </div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert streakSpan to return the span of streak for player in a particular season. </p>
+<ol>
+<li>Insert streakSpan: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=season&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=season&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10</a>
+name: streakSpan</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="gameType"><span class="sc-kGXeez bcLONg"></span>gameType</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert gameType to return streak stats for a particular gameType.</p>
+<ol>
+<li><p>Insert gameType: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10</a></p>
+<p>For a list of all gameTypes: <a href="https://statsapi.mlb.com/api/v1/gameTypes">https://statsapi.mlb.com/api/v1/gameTypes</a>         </p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="season"><span class="sc-kGXeez bcLONg"></span>season<div class="sc-ksYbfQ sc-hmzhuo jsTAxL"> required </div></td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert year to return streak stats for a particular season. </p>
+<ol>
+<li>Insert year: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="sportId"><span class="sc-kGXeez bcLONg"></span>sportId</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">string</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert sportId to return streak stats for a particular sportId.</p>
+<ol>
+<li><p>Insert sportId: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10</a></p>
+<p>For a list of all sportId: <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a> </p>
+</li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="limit"><span class="sc-kGXeez bcLONg"></span>limit</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc"></span><span class="sc-cHGsZl sc-kgAjT hqYVjx">integer</span><span class="sc-cHGsZl sc-kgAjT hqYVjx"> &lt;int32&gt; </span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert a limit to limit return.</p>
+<ol>
+<li>Insert limit: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10</a></li>
+</ol>
+</div></div></div></td></tr><tr><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="hydrate"><span class="sc-kGXeez bcLONg"></span>hydrate</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Insert Hydration(s) to return data for any available stats hydration. The hydrations for Stats contain "person" and "team" which have subhydrations Format "team(subHydration1, subHydrations2)" "</p>
+<ol>
+<li><p>One Hydration Using Team Sub Hydration: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league)">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league)</a></p>
+</li>
+<li><p>Multiple Hydrations Using Team Sub Hydration: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league,social)">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=team(league,social)</a></p>
+</li>
+<li><p>Multiple Hydrations Using Team &amp; Stat Sub Hydrations: <a href="http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(transactions),team(league)">http://statsapi.mlb.com/api/v1/stats?stats=season&amp;sportIds=1&amp;season=2018&amp;group=hitting&amp;sortStat=battingAverage&amp;order=asc&amp;playerPool=Qualified&amp;hydrate=person(transactions),team(league)</a></p>
+<ul>
+<li><p>Available Hydrations:</p>
+<ol>
+<li><p>person</p>
+<ul>
+<li>Hydrations Available Through Person <ol>
+<li>hydrations</li>
+<li>awards</li>
+<li>currentTeam</li>
+<li>team</li>
+<li>rosterEntries</li>
+<li>relatives</li>
+<li>transactions</li>
+<li>social</li>
+<li>education</li>
+<li>stats</li>
+<li>draft</li>
+<li>mixedFeed</li>
+<li>articles</li>
+<li>videos</li>
+<li>xrefId</li>
+</ol>
+</li>
+</ul>
+</li>
+<li><p>team</p>
+<ul>
+<li>Hydrations Available Through Team <ol>
+<li>hydrations</li>
+<li>previousSchedule</li>
+<li>nextSchedule</li>
+<li>venue</li>
+<li>springVenue</li>
+<li>social</li>
+<li>deviceProperties</li>
+<li>game(promotions)</li>
+<li>game(promotions)</li>
+<li>game(atBatPromotions)</li>
+<li>game(tickets)</li>
+<li>game(atBatTickets)</li>
+<li>game(sponsorships)</li>
+<li>league</li>
+<li>videos</li>
+<li>person</li>
+<li>sport</li>
+<li>standings</li>
+<li>division  </li>
+<li>xref</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+<ul>
+<li><p>Notes on "currentTeam" hydration</p>
+<p> When hydrating for "currentTeam" users can use the 'appContext' parameter to specify most recent team by league</p>
+<ol>
+<li>Most Recent Major League Team: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(appContext=majorLeague,currentTeam)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(appContext=majorLeague,currentTeam)%3A%29</a></li>
+<li>Most Recent Minor League Team: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(appContext=minorLeague,currentTeam)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(appContext=minorLeague,currentTeam)%3A%29</a></li>
+</ol>
+</li>
+</ul>
+<ul>
+<li><p>Notes on Stat Hydrations</p>
+<p>Best practice for MLB stat hydrations, use person(stats(group=["statGroup1","statGroup2"],type=["statType1","statType2"]). </p>
+<ol>
+<li><p>Hydrating one statType/statGroup: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bcareer%5D)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting],type=[career])%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,yearByYear%5D)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,yearByYear])%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MLB individual stat hydrations, use person(stats(group=["statGroup1","statGroup2"],type=["statType1","statType2"],season="year"). </p>
+<ol>
+<li><p>Hydrating one statType/statGroup: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bseason%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting],type=[season],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bseason,seasonAdvanced%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],season=2018)%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MiLB stat hydrations, use person(stats(group=["statGroup1,statGroup2"],type=["statType1","statType2],sportId="MiLB Id")). </p>
+<ol>
+<li><p>Hydrating one statType/statGroup: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting%5D,sportId=12,type=%5Bcareer%5D)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=[hitting],sportId=12,type=[career])%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,sportId=12,type=%5Bcareer,yearByYear%5D)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],sportId=12,type=[career,yearByYear])%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of sportIds can be found at <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></strong>  </p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MiLB individual stat hydrations, use person(stats(group=["statGroup1,statGroup2"],type=["statType1","statType2],sportId="MiLB Id",season=2018)). </p>
+<ol>
+<li><p>Hydrating one statType/statGroup: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5Bseason%5D,sportId=12,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=[hitting],type=[season],sportId=12,season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating multiple statTypes/statGroups: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bseason,seasonAdvanced%5D,sportId=12,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[season,seasonAdvanced],sportId=12,season=2018)%3A%29</a></p>
+<p>   <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p>   <strong>List of sportIds can be found at <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></strong>  </p>
+<p>   <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong>                      </p>
+</li>
+</ol>
+<p>Best practice for season stats in date range, use person(stats(group=["statGroup1","statGroup2"],type=["byDateRange"]startDate="mm/dd/yyyy",endDate="mm/dd/yyyy",season="year")).  </p>
+<ol>
+<li><p>Hydrating byDateRange stat: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5BbyDateRange%5D,startDate=05/17/2018,endDate=05/21/2018,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[byDateRange],startDate=05/17/2018,endDate=05/21/2018,season=2018)%3A%29</a></p>
+<p> <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p> <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong>                       </p>
+</li>
+</ol>
+<p>Best practice for limiting playLog &amp; pitchLog, use stats(group=["statGroup1","statGroup2"],type=["playLog"],limit=1,seaon="year").  </p>
+<ol>
+<li><p>Limiting playLog: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5BplayLog%5D,limit=1,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[playLog],limit=1,season=2018)%3A%29</a></p>
+</li>
+<li><p>Limiting pitchLog: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5BpitchLog%5D,limit=1,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[pitchLog],limit=1,season=2018)%3A%29</a></p>
+<p> <strong>List of statTypes can be found at <a href="https://statsapi.mlb.com/api/v1/statTypes">https://statsapi.mlb.com/api/v1/statTypes</a></strong></p>
+<p> <strong>List of statGroups can be found at <a href="https://statsapi.mlb.com/api/v1/statGroups">https://statsapi.mlb.com/api/v1/statGroups</a></strong> </p>
+</li>
+</ol>
+<p>Best practice for metrics in stat hydrations, use person(stats(type=[metricAverages],metrics=[launchSpeed],season=2018)) or person(stats(type=[metricLog],metrics=[launchSpeed],season=2018)). </p>
+<ol>
+<li><p>Hydrating one metric with metricAverages: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(type=%5BmetricAverages%5D,metrics=%5BlaunchSpinRate%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(type=[metricAverages],metrics=[launchSpinRate],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple metrics with metricAverages: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(type=%5BbyMonth,metricAverages%5D,metrics=%5BlaunchSpeed,launchSpinRate%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(type=[byMonth,metricAverages],metrics=[launchSpeed,launchSpinRate],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one metric with metricLog: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;teamId=147&amp;hydrate=person(stats(type=%5BmetricLog%5D,metrics=%5BlaunchSpinRate%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;teamId=147&amp;hydrate=person(stats(type=[metricLog],metrics=[launchSpinRate],season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple metrics with metricLog: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;teamId=147&amp;hydrate=person(stats(type=%5BbyMonth,metricLog%5D,metrics=%5BlaunchSpeed,launchSpinRate%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;teamId=147&amp;hydrate=person(stats(type=[byMonth,metricLog],metrics=[launchSpeed,launchSpinRate],season=2018)%3A%29</a></p>
+<p><strong>List of metrics can be found at <a href="https://statsapi.mlb.com/api/v1/metrics">https://statsapi.mlb.com/api/v1/metrics</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MLB sitCodes in stat hydrations, use person(stats(type=[statSplits],sitCodes=[h,a],season="year")). </p>
+<ol>
+<li><p>Hydrating one sitCode: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5BstatSplits%5D,sitCodes=a)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting],type=[statSplits],sitCodes=a)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple sitCodes: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,statSplits%5D,sitCodes=%5Ba,h%5D)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,statSplits],sitCodes=[a,h])%3A%29</a></p>
+<p><strong>List of sitCodes can be found at <a href="https://statsapi.mlb.com/api/v1/situationCodes">https://statsapi.mlb.com/api/v1/situationCodes</a></strong></p>
+</li>
+</ol>
+<p>Best practice for MiLB sitCodes in stat hydrations, use person(stats(type=[statSplits],sitCodes=[h,a],season="year",sportId = "MiLB Id")). </p>
+<ol>
+<li><p>Hydrating one sitCode: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting%5D,type=%5BstatSplits%5D,sportId=12,sitCodes=a,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=[hitting],type=[statSplits],sportId=12,sitCodes=a,season=2018)%3A%29</a></p>
+</li>
+<li><p>Hydrating one statType and multiple sitCodes: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=%5Bhitting,pitching%5D,type=%5Bcareer,statSplits%5D,sportId=12,sitCodes=%5Ba,h%5D,season=2018)%3A%29">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=12&amp;limit=10&amp;hydrate=person(stats(group=[hitting,pitching],type=[career,statSplits],sportId=12,sitCodes=[a,h],season=2018)%3A%29</a></p>
+<p><strong>List of sitCodes can be found at <a href="https://statsapi.mlb.com/api/v1/situationCodes">https://statsapi.mlb.com/api/v1/situationCodes</a></strong> </p>
+<p><strong>List of sportIds can be found at <a href="http://statsapi.mlb.com/api/v1/sports">http://statsapi.mlb.com/api/v1/sports</a></strong>            </p>
+</li>
+</ol>
+</li>
+</ul>
+</div></div></div></td></tr><tr class="last undefined"><td class="sc-cSHVUG sc-chPdSV ffryYJ" kind="field" title="fields"><span class="sc-kGXeez bcLONg"></span>fields</td><td class="sc-kgoBCf kGwPhO"><div><div><span class="sc-cHGsZl sc-TOsTZ fKyGWc">Array of </span><span class="sc-cHGsZl sc-kgAjT hqYVjx">strings</span></div> <div><div class="sc-jWBwVP sc-iRbamj gDsWLk"><p>Comma delimited list of specific fields to be returned. Format: topLevelNode, childNode, attribute</p>
+<p>Example: <a href="http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;fields=streaks,person,fullName,stats,gamesPlayed,hits">http://statsapi.mlb.com/api/v1/stats/streaks?gameType=R&amp;streakSpan=notableInSeason&amp;streakType=hittingStreakOverall&amp;season=2018&amp;sportId=1&amp;limit=10&amp;fields=streaks,person,fullName,stats,gamesPlayed,hits</a></p>
+</div></div></div></td></tr></tbody></table></div><div><h3 class="sc-eXEjpC espozG"> Responses </h3><div><div class="sc-kPVwWT fDvFMp"><svg class="sc-jTzLTM NifDa" version="1.1" viewBox="0 0 24 24" x="0" xmlns="http://www.w3.org/2000/svg" y="0"><polygon points="17.3 8.3 12 13.6 6.7 8.3 5.3 9.7 12 16.4 18.7 9.7 "></polygon></svg><strong>200 </strong><span class="sc-jlyJG evvbxn"><p>OK</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>401 </strong><span class="sc-jlyJG evvbxn"><p>Unauthorized</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>403 </strong><span class="sc-jlyJG evvbxn"><p>Forbidden</p>
+</span></div></div><div><div class="sc-kPVwWT iquxJz"><strong>404 </strong><span class="sc-jlyJG evvbxn"><p>Not Found</p>
+</span></div></div></div></div><div class="sc-EHOje sc-bZQynM dtUibw"><div class="sc-kTUwUJ ldTMcP"><div class="sc-gxMtzJ dHLKeu"><span class="sc-dfVpRl http-verb get jBjYbV" type="get"> get</span> <span class="sc-dqBHgY iENVAs">/v1/stats/streaks</span><svg class="sc-jTzLTM OtKQc" version="1.1" viewBox="0 0 24 24" x="0" xmlns="http://www.w3.org/2000/svg" y="0" style="margin-right: -25px;"><polygon points="17.3 8.3 12 13.6 6.7 8.3 5.3 9.7 12 16.4 18.7 9.7 "></polygon></svg></div><div class="sc-gzOgki lkvpfX"><div class="sc-iyvyFf eftLSo"><div class="sc-jWBwVP sc-iRbamj gDsWLk"></div><div><div class="sc-hwwEjo bwgXFh"><span>https://statsapi.mlb.com/api</span>/v1/stats/streaks</div></div></div></div></div></div></div></div>
