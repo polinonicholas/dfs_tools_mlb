@@ -95,8 +95,8 @@ def get_historical_data(year):
                     gc.collect()
                     games = []
                     path=pickle_path('historical_data' + '_' + str(year))
-                    fields = 'dates,date,games,status,codedGameState,weather,condition,temp,wind,linescore,teams,home,away,runs,hits,currentInning,venue,id,dayNight,seriesGameNumber,officials,gamePk,probablePitcher'
-                    hydrate = 'weather,linescore,officials,probablePitcher'
+                    fields = 'dates,date,games,status,codedGameState,weather,condition,temp,wind,linescore,teams,home,away,runs,hits,currentInning,venue,id,dayNight,seriesGameNumber,officials,gamePk,probablePitcher,scoringPlays,result,event'
+                    hydrate = 'weather,linescore,officials,probablePitcher,scoringplays'
                     try:
                         season = next(x for x in past_seasons() if str(x['season_id']) == str(year))
                     except StopIteration:
@@ -163,6 +163,10 @@ def get_historical_data(year):
                                         d['home_score'] = home_team['runs']
                                         d['away_score'] = away_team['runs']
                                         d['venue_id'] = y['venue']['id']
+                                        d['home_runs'] = 0
+                                        for z in y['scoringPlays']:
+                                            if z['result']['event'] == 'Home Run':
+                                                d['home_runs'] += 1
                                         try:
                                             d['last_inning'] = y['linescore']['currentInning']
                                         except KeyError:
@@ -218,14 +222,13 @@ def historical_data(start, end=None):
     if not end:
         end = start + 1
     if start > end:
-        raise ValueError('Start cannot be after end. Get da')
+        raise ValueError('Start cannot be after end.')
     season_range = range(start,end)
     dir_path = settings.ARCHIVE_DIR
     if len(season_range) == 1:
         file_path = dir_path.joinpath(pickle_path(name = 'historical_data' + '_' + str(season_range[0])))
         try:
             if season_range[0] != int(current_season()['season_id']):
-                print()
                 with open(file_path, "rb") as f:
                         season = pd.read_pickle(f)
                         f.close()

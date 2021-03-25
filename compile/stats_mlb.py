@@ -6,7 +6,7 @@ import statsapi
 import pandas as pd
 import pickle
 import re
-
+from dfs_tools_mlb.utils.time import time_frames as tf
 """
 seasons: list of years (e.g. [2020])
 player_group: 'hitting' or 'pitching'
@@ -449,3 +449,24 @@ def get_splits_p(seasons,sport=1,pool='ALL',get_all=True):
             else:
                 pickle.dump(players, file)
     return players
+
+
+# optionally pass a filter: filt2={'start': '2016-04-01','end': '2016-06-01'}
+def get_p_diff(player_id, season1, season2, filt1='', filt2=''):
+    df1 = get_statcast_p(player_id, season1)
+    df2 = get_statcast_p(player_id, season2)
+    if filt1:
+        end1 = filt1.get('end', pd.to_datetime('today'))
+        start1 = filt1['start']
+        df1 = df1[(df1['date'] >= start1) & (df1['date'] < end1)].reset_index()
+        print('xxxxx')
+    if filt1:
+        end2 = filt2.get('end', pd.to_datetime('today'))
+        start2 = filt2['start']
+        df2 = df2[(df2['date'] >= start2) & (df2['date'] < end2)].reset_index()
+        print('yyyyyy')
+    speed_diff = df1['effectiveSpeed'].max() - df2['effectiveSpeed'].max()
+    spin_diff = df1['releaseSpinRate'].max() - df2['releaseSpinRate'].max()
+    launch_diff = df1['launchAngle'].max() - df2['launchAngle'].max()
+    return {'speed': speed_diff, 'spin': spin_diff, 'launch': launch_diff}
+

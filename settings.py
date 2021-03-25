@@ -6,6 +6,8 @@ BASE_DIR = Path(inspect.getfile(dfs_tools_mlb)).resolve().parent
 STORAGE_DIR = Path(BASE_DIR, 'compile', 'storage').resolve()
 ARCHIVE_DIR = Path(STORAGE_DIR, 'archives').resolve()
 
+use_fangraphs = False
+
 storage_settings = {
 	'archive_stats': True,
 }
@@ -34,7 +36,8 @@ stat_splits ={
 # int(current_season()['season_id']) + 1 circular import
 stat_range = {
     'start': 2016,
-    'end' : 2022
+    'end' : 2022,
+    'player_start': 2019
     }
 
 

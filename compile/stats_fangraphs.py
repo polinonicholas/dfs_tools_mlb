@@ -3,7 +3,7 @@ from dfs_tools_mlb.compile.fangraphs import fangraphs_urls
 from dfs_tools_mlb.compile.static_mlb import team_info
 from dfs_tools_mlb.utils.time import time_frames as tf
 from dfs_tools_mlb import settings
-from dfs_tools_mlb import config
+from dfs_tools_mlb.config import get_driver_options, get_driver_path, driver_settings
 from dfs_tools_mlb.utils.selenium import dl_wait_chrome
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -15,6 +15,8 @@ from time import sleep
 import pandas as pd
 import pickle
 from functools import cached_property
+
+
 class Stats:
     def __init__(self,
         player_type, 
@@ -48,15 +50,17 @@ class Stats:
                 self.stat_types = [0,1,2,3,4,5,6,7,8,16,17,18,19,20,21,22,23,24]
             if not kwargs.get('qualified_only'):
                 self.qualified_only = '0'
-        self.get_stats
+        # self.get_stats
     @staticmethod
     def get_driver():
-        if config.driver_settings.get('name', 'chrome') == 'chrome':
-            driver = webdriver.Chrome(config.driver_path, options=config.driver_options)
+        if driver_settings.get('name', 'chrome') == 'chrome':
+            driver_path = get_driver_path('chrome')
+            driver_options = get_driver_options('chrome', driver_settings.get('profile', None), driver_settings.get('use_profile', False))
+            driver = webdriver.Chrome(driver_path, options=driver_options)
             return driver
     @staticmethod
     def driver_downloads(driver):
-        if config.driver_settings.get('name', 'chrome') == 'chrome':
+        if driver_settings.get('name', 'chrome') == 'chrome':
             paths = WebDriverWait(driver, 120, 1).until(dl_wait_chrome)
             return paths
     @staticmethod
@@ -94,6 +98,7 @@ class Stats:
                 file.close()
         else:
             current_players = pd.read_pickle(settings.STORAGE_DIR.joinpath(f'stats_{tf.today}'))
+        current_players.reset_index(inplace=True, drop = True)
         return current_players
     @staticmethod
     def modify_team_name(

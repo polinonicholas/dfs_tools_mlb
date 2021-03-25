@@ -32,5 +32,5 @@ def get_driver_options(driver_name, driver_profile, use_profile):
 	return options
 
 
-driver_path = get_driver_path(driver_settings.get('name', 'chrome'))
-driver_options = get_driver_options(driver_settings.get('name', 'chrome'), driver_settings.get('profile', None), driver_settings.get('use_profile', False))
+# driver_path = get_driver_path(driver_settings.get('name', 'chrome'))
+# driver_options = get_driver_options(driver_settings.get('name', 'chrome'), driver_settings.get('profile', None), driver_settings.get('use_profile', False))

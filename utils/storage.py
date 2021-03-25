@@ -20,7 +20,7 @@ from dfs_tools_mlb.utils.time import time_frames as tf
 import os
 def clean_storage():
     for file in Path.iterdir(settings.STORAGE_DIR):
-        if not file.is_dir() and not str(file).endswith(str(tf.today)):
+        if not file.is_dir() and not str(tf.today) in str(file):
             if not settings.storage_settings.get('archive_stats', False):
                     file.unlink()
             else:
