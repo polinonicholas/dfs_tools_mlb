@@ -1,7 +1,7 @@
 from dfs_tools_mlb import settings
 from dfs_tools_mlb.compile.fanduel import fd_scoring
 from dfs_tools_mlb.compile.stats_mlb import get_splits_h, get_splits_p
-from dfs_tools_mlb.utils.storage import clean_storage
+from dfs_tools_mlb.utils.storage import clean_directory
 import pandas as pd
 from dfs_tools_mlb.utils.time import time_frames as tf
 import pickle
@@ -179,7 +179,7 @@ if not data_path_h.exists():
 
     with open(data_path_h, "wb") as file:
         pickle.dump(h_splits, file)
-    clean_storage()
+    clean_directory(settings.STORAGE_DIR)
 else:
     h_splits = pd.read_pickle(data_path_h)
 h_q = h_splits[h_splits['pa'] >= h_splits['pa'].mean()]
@@ -487,7 +487,7 @@ if not data_path_p.exists():
     p_splits['fd_pa_b_vl'] = ((p_splits['bases+_vl'] * b) + (p_splits['er_vl'] * (r + rbi)) + (p_splits['sb_vl'] * s)) / p_splits['batters_faced_vl']
     with open(data_path_p, "wb") as file:
         pickle.dump(p_splits, file)
-    clean_storage()
+    clean_directory(settings.STORAGE_DIR)
 else:
     p_splits = pd.read_pickle(data_path_p)
     

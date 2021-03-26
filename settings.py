@@ -5,6 +5,9 @@ from pathlib import Path
 BASE_DIR = Path(inspect.getfile(dfs_tools_mlb)).resolve().parent
 STORAGE_DIR = Path(BASE_DIR, 'compile', 'storage').resolve()
 ARCHIVE_DIR = Path(STORAGE_DIR, 'archives').resolve()
+LINEUP_DIR = Path(STORAGE_DIR, 'confirmed_lineups').resolve()
+SP_DIR = Path(STORAGE_DIR, 'confirmed_sp').resolve()
+BP_DIR = Path(STORAGE_DIR, 'bullpens').resolve()
 
 use_fangraphs = False
 
