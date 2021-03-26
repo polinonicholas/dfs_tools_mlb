@@ -13,7 +13,7 @@ def current_parks():
     return parks
 
 park_data = game_data[game_data['venue_id'].isin(current_parks())]
-park_data
+
 
 # if __name__ == '__main__':
 #     parks = current_parks()

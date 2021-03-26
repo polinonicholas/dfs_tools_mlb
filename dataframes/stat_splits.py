@@ -256,6 +256,7 @@ if not data_path_p.exists():
     p_splits['runners_allowed'] = p_splits['hits'] + p_splits['bb'] + p_splits['hb']
     p_splits['dp_ra'] = p_splits['gidp'] / p_splits['runners_allowed']
     p_splits['strike_ball'] = p_splits['strikes'] / p_splits['balls']
+    p_splits['ra-_b'] = (p_splits['runners_allowed'] - (p_splits['gidp'] + p_splits['cs+'])) / p_splits['batters_faced']
     
     p_splits['pitches_start'] = p_splits['total_pitches_sp'] / p_splits['games_sp']
     p_splits['innings_start'] = (p_splits['outs_sp'] / 3) / (p_splits['games_sp'])
@@ -274,6 +275,9 @@ if not data_path_p.exists():
     p_splits['ip_sp'] = p_splits['outs_sp'] / 3
     p_splits['bases+_sp'] = p_splits['total_bases_sp'] + p_splits['bb_sp'] + p_splits['hb_sp']
     p_splits['sb+_sp'] = p_splits['sb_sp'] + p_splits['wild_pitches_sp'] + p_splits['balks_sp']
+    p_splits['cs+_sp'] = p_splits['cs_sp'] + p_splits['pickoffs_sp']
+    p_splits['ra-_b_sp'] = (p_splits['runners_allowed_sp'] - (p_splits['gidp_sp'] + p_splits['cs+_sp'])) / p_splits['batters_faced_sp']
+    
     
     p_splits['ppi_rp'] = p_splits['total_pitches_rp'] / (p_splits['outs_rp'] / 3)
     p_splits['ppb_rp'] = p_splits['total_pitches_rp'] / p_splits['batters_faced_rp']
@@ -287,6 +291,8 @@ if not data_path_p.exists():
     p_splits['ip_rp'] = p_splits['outs_rp'] / 3
     p_splits['bases+_rp'] = p_splits['total_bases_rp'] + p_splits['bb_rp'] + p_splits['hb_rp']
     p_splits['sb+_rp'] = p_splits['sb_rp'] + p_splits['wild_pitches_rp'] + p_splits['balks_rp']
+    p_splits['cs+_rp'] = p_splits['cs_rp'] + p_splits['pickoffs_rp']
+    p_splits['ra-_b_rp'] = (p_splits['runners_allowed_rp'] - (p_splits['gidp_rp'] + p_splits['cs+_rp'])) / p_splits['batters_faced_rp']
     
     
     
@@ -302,6 +308,8 @@ if not data_path_p.exists():
     p_splits['ip_vr'] = p_splits['outs_vr'] / 3
     p_splits['bases+_vr'] = p_splits['total_bases_vr'] + p_splits['bb_vr'] + p_splits['hb_vr']
     p_splits['sb+_vr'] = p_splits['sb_vr'] + p_splits['wild_pitches_vr'] + p_splits['balks_vr']
+    p_splits['cs+_vr'] = p_splits['cs_vr'] + p_splits['pickoffs_vr']
+    p_splits['ra-_b_vr'] = (p_splits['runners_allowed_vr'] - (p_splits['gidp_vr'] + p_splits['cs+_vr'])) / p_splits['batters_faced_vr']
     
     p_splits['ppi_vl'] = p_splits['total_pitches_vl'] / (p_splits['outs_vl'] / 3)
     p_splits['ppb_vl'] = p_splits['total_pitches_vl'] / p_splits['batters_faced_vl']
@@ -315,6 +323,8 @@ if not data_path_p.exists():
     p_splits['ip_vl'] = p_splits['outs_vl'] / 3
     p_splits['bases+_vl'] = p_splits['total_bases_vl'] + p_splits['bb_vl'] + p_splits['hb_vl'] 
     p_splits['sb+_vl'] = p_splits['sb_vl'] + p_splits['wild_pitches_vl'] + p_splits['balks_vl']
+    p_splits['cs+_vl'] = p_splits['cs_vl'] + p_splits['pickoffs_vl']
+    p_splits['ra-_b_vl'] = (p_splits['runners_allowed_vl'] - (p_splits['gidp_vl'] + p_splits['cs+_vl'])) / p_splits['batters_faced_vl']
     
     #weighted by catergoy/batter faced - right
     p_splits['fd_bb_weight_vr'] = (((p_splits['bb_vr'] * weight_bb) * er) / p_splits['batters_faced_vr'])
