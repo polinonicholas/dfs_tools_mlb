@@ -13,8 +13,8 @@ from json import JSONDecodeError
 from dfs_tools_mlb.utils.strings import plural
 from dfs_tools_mlb.utils.time import time_frames as tf
 from dfs_tools_mlb.dataframes.game_data import game_data
-from dfs_tools_mlb.compile.fanduel import fd_weights as fw
 from dfs_tools_mlb.utils.storage import pickle_path
+from dfs_tools_mlb.utils.strings import ids_string
 import numpy as np
 import pickle
 import datetime
@@ -35,50 +35,43 @@ class Team(metaclass=IterTeam):
         self._all_teams.append(self)
         self.id = mlb_id
         self.name = name
-        self.confirmed_lu = False
-        
-    @cached_property
-    def depth_get(self):
-        print(f"Getting {self.name.capitalize()}' depth chart.")
-        return statsapi.get('team_roster', {'teamId': self.id, 'rosterType': 'depthChart'})['roster']
-    
-    @cached_property
-    def depth_lu(self):
-        player_ids=set()
-        for player in self.depth_get:
-            player_ids.add(str(player['person']['id']))
-        ids = ",".join(player_ids)
-        print(f"Getting information for players on {self.name.capitalize()}' depth chart.")
-        return statsapi.get('people', {'personIds': ids})['people']
-    
+        self.confirmed_lineup = False
+        self.confirmed_sp = False
     @cached_property
     def depth(self):
+        file = pickle_path(name=f"{self.name}_depth_{tf.today}", directory=settings.DEPTH_DIR)
+        path = settings.DEPTH_DIR.joinpath(file)
+        if path.exists():
+            depth = pd.read_pickle(path)
+            return depth
+        hydrate = 'person'
+        call = statsapi.get('team_roster', {'teamId': self.id, 'rosterType': 'depthChart', 'hydrate': hydrate})['roster']
         depth = {
             'starters': [],
             'bullpen': [],
             'hitters': []
             }
-        for p in self.depth_get:
-            p_id = p['person']['id']
-            p_info = next(x for x in self.depth_lu if x['id'] == p_id)
-            player = {'mlb_id': p_info['id'],
-                      'name': p_info.get('fullName', ''),
-                      'mlb_api': p_info.get('link', ''),
-                      'number': p_info.get('primaryNumber', ''),
-                      'born': p_info.get('birthCity', '') + ', ' + p_info.get('birthStateProvince', '') ,
-                      'height': '.'.join(re.findall('[0-9]', p_info.get('height', ''))),
-                      'weight': p_info.get('weight', ''),
-                      'nickname': p_info.get('nickName', ''),
-                      'debut': p_info.get('mlbDebutDate', ''),
-                      'bat_side': p_info.get('batSide', {}).get('code', ''),
-                      'pitch_hand': p_info.get('pitchHand', {}).get('code', ''),
-                      'age': p_info.get('currentAge', ''),
+        for p in call:
+            
+            player = {'mlb_id': p['person']['id'],
+                      'name': p['person']['fullName'],
+                      'mlb_api': p['person'].get('link', ''),
+                      'number': p['person'].get('primaryNumber', ''),
+                      'born': p['person'].get('birthCity', '') + ', ' + p['person'].get('birthStateProvince', '') ,
+                      'height': '.'.join(re.findall('[0-9]', p['person'].get('height', ''))),
+                      'weight': p['person'].get('weight', ''),
+                      'nickname': p['person'].get('nickName', ''),
+                      'debut': p['person'].get('mlbDebutDate', ''),
+                      'bat_side': p['person'].get('batSide', {}).get('code', ''),
+                      'pitch_hand': p['person'].get('pitchHand', {}).get('code', ''),
+                      'age': p['person'].get('currentAge', ''),
                       'note': p.get('note', ''),
                       'position_type': p['position']['type'],
                       'position': p['position']['code'],
                       'status': p.get('status', {}).get('code', ''),
                       'team': self.name
                       }
+
             position = str(player['position'])
             if position in mac.players.h:
                 depth['hitters'].append(player)
@@ -86,28 +79,21 @@ class Team(metaclass=IterTeam):
                 depth['starters'].append(player)
             elif position in mac.players.bullpen:
                 depth['bullpen'].append(player)
+        with open(file, "wb") as f:
+            pickle.dump(depth, f)
         return depth
-    
-    @cached_property
-    def full_roster_get(self):
-        print(f"Getting {self.name.capitalize()}' full roster.")
-        return statsapi.get('team_roster', {'teamId': self.id, 'rosterType': '40Man'})['roster'] 
-    
-    @cached_property
-    def full_roster_lu(self):
-        player_ids=set()
-        for player in self.full_roster_get:
-            player_ids.add(str(player['person']['id']))
-        ids = ",".join(player_ids)
-        print(f"Getting information for players on {self.name.capitalize()}' full-roster.")
-        return statsapi.get('people', {'personIds': ids})['people']
-    
     @cached_property
     def full_roster(self):
+        file = pickle_path(name=f"{self.name}_roster_{tf.today}", directory=settings.ROSTER_DIR)
+        path = settings.ROSTER_DIR.joinpath(file)
+        if path.exists():
+            roster = pd.read_pickle(path)
+            return roster
+        hydrate = 'person'
+        call = statsapi.get('team_roster', {'teamId': self.id, 'rosterType': '40Man', 'hydrate': hydrate})['roster']
         roster = []
-        for p in self.full_roster_get:
-            p_id = p['person']['id']
-            p_info = next(x for x in self.full_roster_lu if x['id'] == p_id)
+        for p in call:
+            p_info = p['person']
             player = {'mlb_id': p_info['id'],
                       'name': p_info.get('fullName', ''),
                       'mlb_api': p_info.get('link', ''),
@@ -137,39 +123,22 @@ class Team(metaclass=IterTeam):
                 player['h'] = True
             roster.append(player)
         roster.extend(self.nri)
+        with open(file, "wb") as f:
+            pickle.dump(roster, f)
         return roster
-    @lru_cache
-    def batters(self, active=False):
-        roster = pd.DataFrame(self.full_roster)
-        batters = roster[roster['h'] == True]
-        if active:
-            batters = batters[batters['status'] == 'A']
-        batters = batters.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
-        return batters
-    
-    @cached_property
-    def nri_get(self):
-        print(f"Getting {self.name.capitalize()}' non-roster invitees.")
-        return statsapi.get('team_roster', {'teamId': self.id, 'rosterType': 'nonRosterInvitees'})['roster']
-    
-    @cached_property
-    def nri_lu(self):
-        player_ids=set()
-        if self.nri_get:
-            for player in self.nri_get:
-                player_ids.add(str(player['person']['id']))
-            ids = ",".join(player_ids)
-            print(f"Getting information for {self.name.capitalize()}' non-roster-invitees.")
-            return statsapi.get('people', {'personIds': ids})['people']
-        return []
-    
     @cached_property
     def nri(self):
+        file = pickle_path(name=f"{self.name}_nri_{tf.today}", directory=settings.NRI_DIR)
+        path = settings.NRI_DIR.joinpath(file)
+        if path.exists():
+            nri = pd.read_pickle(path)
+            return nri
+        hydrate = 'person'
+        call = statsapi.get('team_roster', {'teamId': self.id, 'rosterType': 'nonRosterInvitees', 'hydrate': hydrate})['roster']
         nri = []
-        if self.nri_get:
-            for p in self.nri_get:
-                p_id = p['person']['id']
-                p_info = next(x for x in self.nri_lu if x['id'] == p_id)
+        if call:
+            for p in call:
+                p_info = p['person']
                 player = {'mlb_id': p_info['id'],
                           'name': p_info.get('fullName', ''),
                           'mlb_api': p_info.get('link', ''),
@@ -200,20 +169,25 @@ class Team(metaclass=IterTeam):
                     player['p'] = True
                     player['h'] = True
                 nri.append(player)
+        with open(file, "wb") as f:
+            pickle.dump(nri, f)
         return nri
-    
     #list of integers representing ids of every affiliated player.
     @cached_property
     def all_player_ids(self):
         player_ids = []
-        nri_ids = []
-        for player in self.nri_get:
-            nri_ids.append(player['person']['id'])
-        for player in self.full_roster_get:
-            player_ids.append(player['person']['id'])
-        player_ids.extend(nri_ids)
+        for player in self.full_roster:
+            player_ids.append(player['mlb_id'])
         return player_ids
-    
+    @lru_cache
+    def batters(self, active=False):
+        roster = pd.DataFrame(self.full_roster)
+        batters = roster[roster['h'] == True]
+        if active:
+            batters = batters[batters['status'] == 'A']
+        batters = batters.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
+        return batters
+   
     @cached_property
     def hitter(self):
         hitters = pd.DataFrame(self.depth['hitters']).apply(pd.to_numeric, errors = 'ignore')
@@ -363,9 +337,19 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def last_game(self):
+        file = pickle_path(name=f"{self.name}_game_{tf.today}", directory=settings.GAME_DIR)
+        path = settings.GAME_DIR.joinpath(file)
+        if path.exists():
+            game = pd.read_pickle(path)
+            return game
+            if not game['gameData']['game']['doubleHeader'] == 'Y' and game['gameData']['gameNumber'] == 1:
+                return game
         if self.last_game_pk:
             print(f"Getting boxscore {self.name.capitalize()}' last game.")
-            return statsapi.get('game', {'gamePk': self.last_game_pk})
+            game =  statsapi.get('game', {'gamePk': self.last_game_pk})
+            with open(file, "wb") as f:
+                pickle.dump(game, f)
+            return game
         return self.last_game_pk
     
     @cached_property
@@ -434,7 +418,15 @@ class Team(metaclass=IterTeam):
                 sp_info = self.next_game['gameData']['players'][sp_id]
                 return sp_info
             except KeyError:
-                return f"The {self.opp_name} have not confirmed their starting pitcher."
+                starters = self.opp_instance.rested_sp
+                projected_sp = starters.loc[starters['fd_ps_s'].idxmax()]
+                if len(projected_sp.index) != 0:
+                    i_d = projected_sp['mlb_id'].item()
+                    return statsapi.get('people', {'personIds': i_d})['people'][0]
+                bullpen = self.opp_instance.bullpen
+                projected_sp = bullpen.loc[bullpen['batters_faced_sp'].idxmax()]
+                i_d = projected_sp['mlb_id'].item()
+                return statsapi.get('people', {'personIds': i_d})['people'][0]
         return self.next_game_pk
     @cached_property
     def projected_sp(self):
@@ -445,9 +437,16 @@ class Team(metaclass=IterTeam):
                 self.confirmed_sp = True
                 return sp_info
             except KeyError:
-                return f"The {self.name} have not confirmed their starting pitcher."
+                starters = self.rested_sp
+                projected_sp = starters.loc[starters['fd_ps_s'].idxmax()]
+                if len(projected_sp.index) != 0:
+                    i_d = projected_sp['mlb_id'].item()
+                    return statsapi.get('people', {'personIds': i_d})['people'][0]
+                bullpen = self.bullpen
+                projected_sp = bullpen.loc[bullpen['batters_faced_sp'].idxmax()]
+                i_d = projected_sp['mlb_id'].item()
+                return statsapi.get('people', {'personIds': i_d})['people'][0]
         return self.next_game_pk
-    
     @cached_property
     def last_opp_sp(self):
         if self.last_game_pk:
@@ -568,13 +567,13 @@ class Team(metaclass=IterTeam):
                 try:
                     projected_sp = roster[roster['mlb_id'] == self.projected_sp['id']]
                 except TypeError:
-                    starters = self.starter[~self.starter['mlb_id'].isin(excluded)]
-                    return starters.loc[starters['fd_ps_s'].idxmax()]
+                    starters = self.rested_sp[~self.rested_sp['mlb_id'].isin(excluded)]
+                    projected_sp = starters.loc[starters['fd_ps_s'].idxmax()]
                 if len(projected_sp.index) != 0:
                     return projected_sp.loc[projected_sp['age'].idxmax()]
                 else:
-                    starters = self.starter[~self.starter['mlb_id'].isin(excluded)]
-                    return starters.loc[starters['fd_ps_s'].idxmax()]
+                    bullpen = self.bullpen[~self.bullpen['mlb_id'].isin(excluded)]
+                    return bullpen.loc[bullpen['batters_faced_sp'].idxmax()]
             else: 
                 hitters = self.hitter[~self.hitter['mlb_id'].isin(excluded)]
                 return hitters.loc[hitters[h_key].idxmax()]
@@ -595,8 +594,9 @@ class Team(metaclass=IterTeam):
                     return hitters.loc[hitters[h_key].idxmax()]
     
     def lineup_df(self):
-        data_path = pickle_path(name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR)
-        if not data_path.exists():
+        file = pickle_path(name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR)
+        path = settings.LINEUP_DIR.joinpath(file)
+        if not path.exists():
             lineup_ids = self.lineup
             lineup = pd.DataFrame(lineup_ids, columns= ["mlb_id"])
             roster = pd.DataFrame(self.full_roster)
@@ -617,7 +617,7 @@ class Team(metaclass=IterTeam):
                 h_key = 'fd_wps_pa_' + self.o_split
                 i_d = h_df.loc[h_df[h_key].idxmin(), 'mlb_id'].item()
                 h_df.drop(h_df[h_key].idxmin(), inplace=True)
-                new_row = self.get_replacement('S', 'pitcher', lineup_ids)
+                new_row = self.get_replacement('S', 'Pitcher', lineup_ids)
                 h_df = h_df.append(new_row, ignore_index = True)
                 lineup_ids.remove(i_d)
                 lineup_ids.append(int(new_row['mlb_id']))
@@ -709,7 +709,7 @@ class Team(metaclass=IterTeam):
             p_df['exp_ra'] = floor((exp_pa_r_sp * p_df['ra-_b_vr'].max()) + (exp_pa_l_sp * p_df['ra-_b_vl'].max()))
             p_df['exp_inn'] = (p_df['exp_bf'].max() - p_df['exp_ra'].max()) / 3
             if self.is_home:
-                exp_bp_inn = 8.5 - p_df['exp_inn'].max()
+                exp_bp_inn = 8.75 - p_df['exp_inn'].max()
             else:
                 exp_bp_inn = 9 - p_df['exp_inn'].max()
             bp = self.proj_opp_bp
@@ -719,7 +719,7 @@ class Team(metaclass=IterTeam):
             bp.loc[(bp['batters_faced_vl'] < 100) | (bp['ra-_b_vl'].isna()), 'ra-_b_vl'] = p_q_vl['ra-_b_vl'].median()
             bp.loc[(bp['batters_faced_rp'] < 100) | (bp['fd_wpa_b_rp'].isna()), 'fd_wpa_b_rp'] = p_q_rp['fd_wpa_b_rp'].median()
             bp.loc[(bp['batters_faced_rp'] < 100) | (bp['ra-_b_rp'].isna()), 'ra-_b_rp'] = p_q_rp['ra-_b_rp'].median()
-            exp_bf_bp = floor((exp_bp_inn * 3) + ((exp_bp_inn * 3) * bp['ra-_b_rp'].mean()))
+            exp_bf_bp = round((exp_bp_inn * 3) + ((exp_bp_inn * 3) * bp['ra-_b_rp'].mean()))
             first_bp_pa = h_df.loc[(h_df['exp_pa_sp'] == floor(p_df['exp_x_lu'])), 'order'].idxmin()
             order = h_df.loc[first_bp_pa, 'order'].item()
             print(order)
@@ -738,25 +738,36 @@ class Team(metaclass=IterTeam):
             h_df['venue_points'] = h_df['exp_ps_raw'] * self.next_venue_boost
             h_df['temp_points'] = h_df['exp_ps_raw'] * self.temp_boost
             h_df['ump_points'] = h_df['exp_ps_raw'] * self.ump_boost
-            h_df['points'] = (h_df['venue_points'] * fw['venue_h']) + \
-                (h_df['temp_points'] * fw['temp_h']) + (h_df['ump_points'] * fw['ump_h'])
+            h_df['points'] = (h_df['venue_points'] * self.fd_weights['venue_h']) + \
+                (h_df['temp_points'] * self.fd_weights['temp_h']) + (h_df['ump_points'] * self.fd_weights['ump_h'])
             h_df['points'] = (h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points']) / 3
             self.venue_points = self.exp_ps_raw * self.next_venue_boost
             self.temp_points = self.exp_ps_raw * self.temp_boost
             self.ump_points = self.exp_ps_raw * self.ump_boost
-            self.points= (self.venue_points + self.temp_points + self.ump_points) / 3
-            if self.confirmed_lu:
-                with open(data_path, "wb") as file:
-                    pickle.dump(h_df, file)
+            self.points = ((self.venue_points * self.fd_weights['h_venue']) + \
+                           (self.temp_points * self.fd_weights['temp_h']) + \
+                               (self.ump_points * self.fd_weights['ump_h']))
+            if self.confirmed_lineup:
+                with open(file, "wb") as f:
+                    pickle.dump(h_df, f)
         else:
-            h_df = pd.read_pickle(data_path)
+            h_df = pd.read_pickle(path)
+            self.exp_ps_raw = h_df['exp_ps_raw'].sum()
+            self.venue_points = self.exp_ps_raw * self.next_venue_boost
+            self.temp_points = self.exp_ps_raw * self.temp_boost
+            self.ump_points = self.exp_ps_raw * self.ump_boost
+            self.points = ((self.venue_points * self.fd_weights['h_venue']) + \
+                           (self.temp_points * self.fd_weights['temp_h']) + \
+                               (self.ump_points * self.fd_weights['ump_h']))
         return h_df
+    
     def sp_df(self):
         if self.confirmed_sp:
             slug = self.projected_sp['nameSlug']
-            data_path = pickle_path(name=f"{slug}_{tf.today}", directory=settings.LINEUP_DIR)
-            if data_path.exists():
-                p_df = pd.read_pickle(data_path)
+            file = pickle_path(name=f"{slug}_{tf.today}", directory=settings.SP_DIR)
+            path = settings.SP_DIR.joinpath(file)
+            if path.exists():
+                p_df = pd.read_pickle(path)
                 return p_df
         try:
             p_info = self.projected_sp
@@ -778,16 +789,18 @@ class Team(metaclass=IterTeam):
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
         p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum()
-        p_df['venue_points'] = p_df['exp_ps_raw'] * self.next_venue_boost
-        p_df['temp_points'] = p_df['exp_ps_raw'] * self.temp_boost
-        p_df['ump_points'] = p_df['exp_ps_raw'] * self.ump_boost
+        p_df['venue_points'] = p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)
+        p_df['temp_points'] = p_df['exp_ps_raw'] * (-self.temp_boost % 2)
+        p_df['ump_points'] = p_df['exp_ps_raw'] * (-self.ump_boost % 2)
         p_df['points'] = \
-            (p_df['venue_points'] * fw['venue_p']) + \
-                (p_df['temp_points'] * fw['temp_p']) + (p_df['ump_points'] * fw['ump_p'])
-        p_df['lu_mu'] = h_df['exp_pc_sp_raw'].sum()
+            (p_df['venue_points'] * self.fd_weights['venue_p']) + \
+                (p_df['temp_points'] * self.fd_weights['temp_p']) + (p_df['ump_points'] * self.fd_weights['ump_p'])
+        p_df['lu_mu'] = h_df['exp_pc_sp_raw'].sum() * h_df['exp_pa_sp']
         if self.confirmed_sp:
-            with open(data_path, "wb") as file:
-                pickle.dump(p_df, file)
+            slug = self.projected_sp['nameSlug']
+            file = pickle_path(name=f"{slug}_{tf.today}", directory=settings.SP_DIR)
+            with open(file, "wb") as f:
+                pickle.dump(p_df, f)
         return p_df
     def live_game(self):
         try:
@@ -945,15 +958,15 @@ class Team(metaclass=IterTeam):
                 except (TypeError, ValueError):
                     if not np.isnan(avg_wind):
                         return avg_wind
-                    return ''
+                    return 0
             else:
                 if not np.isnan(avg_wind):
                     return avg_wind
-                return ''
+                return 0
         else:
             if not np.isnan(avg_wind):
                 return avg_wind
-            return ''
+            return 0
                 
     @cached_property
     def wind_direction(self):
@@ -971,7 +984,6 @@ class Team(metaclass=IterTeam):
             condition = self.weather.get('condition')
         return condition
     @cached_property
-    
     def venue_temp(self):
         if self.weather:
             temp = self.weather.get('temp')
@@ -1065,16 +1077,18 @@ class Team(metaclass=IterTeam):
         if len(self.projected_ump_data.index) >= 100:
             return self.projected_ump_data['fd_points'].mean() / game_data['fd_points'].mean()
         return 1
+
     @cached_property
     def opp_bullpen(self):
-        data_path = pickle_path(name=f"{self.opp_name}_bp_{tf.today}", directory=settings.BP_DIR)
-        if data_path.exists():
-            bp = pd.read_pickle(data_path)
+        file = pickle_path(name=f"{self.opp_name}_bp_{tf.today}", directory=settings.BP_DIR)
+        path = settings.BP_DIR.joinpath(file)
+        if path.exists():
+            bp = pd.read_pickle(path)
             return bp
         bp = self.opp_instance.bullpen
         bp = bp[(~bp['mlb_id'].isin(self.opp_instance.used_rp)) & (bp['status'] == 'A')]
-        with open(data_path, "wb") as file:
-            pickle.dump(bp, file)
+        with open(file, "wb") as f:
+            pickle.dump(bp, f)
         return bp
     @cached_property
     def proj_opp_bp(self):
@@ -1084,7 +1098,70 @@ class Team(metaclass=IterTeam):
         for team in Team:
             if team.name == self.opp_name:
                 return team
-        
+    @cached_property
+    def fd_weights(self):
+        if self.weather:
+            if self.is_new_series:
+                return {
+                    'venue_p': .40,
+                    'temp_p': .60,
+                    'ump_p': 0,
+                    'venue_h': .60,
+                    'temp_h': .40,
+                    'ump_h': 0
+                    }
+            else:
+                return {
+                    'venue_p': .40,
+                    'temp_p': .50,
+                    'ump_p': .10,
+                    'venue_h': .50,
+                    'temp_h': .40,
+                    'ump_h': .10
+                    }
+        else:
+            if self.is_new_series:
+                return {
+                    'venue_p': 1,
+                    'temp_p': 0,
+                    'ump_p': 0,
+                    'venue_h': 1,
+                    'temp_h': 0,
+                    'ump_h': 0
+                    }
+            else:
+                return {
+                    'venue_p': .75,
+                    'temp_p': 0,
+                    'ump_p': .25,
+                    'venue_h': .85,
+                    'temp_h': 0,
+                    'ump_h': .15
+                    }
+    @cached_property
+    def rested_sp(self):
+        if self.last_game_pk:
+            try:
+                games = self.past_games[-4:]
+            except IndexError:
+                games = self.past_games
+            game_ids = []
+            for game in games:
+                print()
+                game_ids.append(game['games'][0]['gamePk'])
+            game_ids = ids_string(game_ids)
+            call = statsapi.get('schedule', {'gamePks': game_ids, 'sportId': 1, 'hydrate': 'probablePitcher'})
+            recent_sp = set()
+            for g in call['dates']:
+                home_sp = g['games'][0]['teams']['home'].get('probablePitcher', {}).get('id')       
+                away_sp = g['games'][0]['teams']['away'].get('probablePitcher', {}).get('id') 
+                recent_sp.add(home_sp)
+                recent_sp.add(away_sp)
+            starters = self.starter
+            return starters[~starters['mlb_id'].isin(recent_sp)]
+        return set()
+            
+      
        
 athletics = Team(mlb_id = 133, name = 'athletics')
 pirates = Team(mlb_id = 134, name = 'pirates')
@@ -1116,23 +1193,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
-
-# cardinals.points
-# test = cardinals.lineup_df()
-# cardinals.opp_name
-# test2=marlins.lineup_df()
-# # test.columns.tolist()
-# marlins.points
-# test[['name', 'points' , 'exp_ps_sp', 'exp_ps_bp', 'exp_ps_raw', 'venue_points', 'temp_points', 'ump_points', 'is_platoon']]
-# # print(test['points'].sum())
-
-# # red_sox.temp_boost
-# # # # dodgers.temp_boost
-# # # # dodgers.weather
-# # # red_sox.opp_sp_hand
-
-# # astros.opp_sp
-# # cardinals.projected_sp
-
 

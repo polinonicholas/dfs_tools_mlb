@@ -18,12 +18,12 @@ def pickle_path(name='untitled.pickle', directory=settings.ARCHIVE_DIR):
 from pathlib import Path
 from dfs_tools_mlb.utils.time import time_frames as tf
 import os
-def clean_directory(directory):
+def clean_directory(directory, force_delete=False):
     if not directory.exists():
         directory.mkdir(parents=True)
     for file in Path.iterdir(directory):
         if not file.is_dir() and not str(tf.today) in str(file):
-            if not settings.storage_settings.get('archive_stats', False):
+            if not settings.storage_settings.get('archive_stats', False) or force_delete:
                     file.unlink()
             else:
                 settings.ARCHIVE_DIR.mkdir(exist_ok=True, parents=True)

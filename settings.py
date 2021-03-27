@@ -8,6 +8,10 @@ ARCHIVE_DIR = Path(STORAGE_DIR, 'archives').resolve()
 LINEUP_DIR = Path(STORAGE_DIR, 'confirmed_lineups').resolve()
 SP_DIR = Path(STORAGE_DIR, 'confirmed_sp').resolve()
 BP_DIR = Path(STORAGE_DIR, 'bullpens').resolve()
+DEPTH_DIR = Path(STORAGE_DIR, 'depth_charts').resolve()
+ROSTER_DIR = Path(STORAGE_DIR, 'rosters').resolve()
+NRI_DIR = Path(STORAGE_DIR, 'nri').resolve()
+GAME_DIR = Path(STORAGE_DIR, 'recent_games').resolve()
 
 use_fangraphs = False
 

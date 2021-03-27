@@ -17,11 +17,4 @@ fd_scoring = {
         }
     }
 
-fd_weights = {
-    'venue_p': .4,
-    'temp_p': .4,
-    'ump_p': .2,
-    'venue_h': .4,
-    'temp_h': .4,
-    'ump_h': .2
-    }
+
