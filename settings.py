@@ -1,6 +1,8 @@
 import dfs_tools_mlb
 import inspect
 from pathlib import Path
+import glob
+import os
 
 BASE_DIR = Path(inspect.getfile(dfs_tools_mlb)).resolve().parent
 STORAGE_DIR = Path(BASE_DIR, 'compile', 'storage').resolve()
@@ -12,6 +14,18 @@ DEPTH_DIR = Path(STORAGE_DIR, 'depth_charts').resolve()
 ROSTER_DIR = Path(STORAGE_DIR, 'rosters').resolve()
 NRI_DIR = Path(STORAGE_DIR, 'nri').resolve()
 GAME_DIR = Path(STORAGE_DIR, 'recent_games').resolve()
+FD_DIR = Path(STORAGE_DIR, 'fd_entries').resolve()
+
+DL_FOLDER = "C:/Users/nicho/Downloads"
+FD_FILE_MATCH = DL_FOLDER + "/FanDuel-MLB*entries-upload-template*"
+FD_FILES = glob.glob(FD_FILE_MATCH) 
+
+
+    
+    
+    
+
+
 
 use_fangraphs = False
 

@@ -1,14 +1,33 @@
 from dfs_tools_mlb import settings
-from dfs_tools_mlb.compile.fanduel import fd_scoring
 from dfs_tools_mlb.compile.stats_mlb import get_splits_h, get_splits_p
 from dfs_tools_mlb.utils.storage import clean_directory
 import pandas as pd
 from dfs_tools_mlb.utils.time import time_frames as tf
 import pickle
 
+
+
 data_path_h = settings.STORAGE_DIR.joinpath(f'player_data_h_{tf.today}.pickle')
 data_path_p = settings.STORAGE_DIR.joinpath(f'player_data_p_{tf.today}.pickle')
 if not data_path_h.exists() or not data_path_p.exists():
+    fd_scoring = {
+    'hitters': {
+        'base': 3,
+        'rbi' : 3.5,
+        'run' : 3.2,
+        'sb' : 6,
+        'hr': 18.7,
+        
+        },
+    'pitchers': {
+        'inning': 3,
+        'out': 1,
+        'k' : 3,
+        'er': -3,
+        'qs': 4,
+        'win': 6
+        }
+    }
     i = fd_scoring['pitchers']['inning']
     k = fd_scoring['pitchers']['k']
     er = fd_scoring['pitchers']['er']
@@ -262,6 +281,7 @@ if not data_path_p.exists():
     p_splits['innings_start'] = (p_splits['outs_sp'] / 3) / (p_splits['games_sp'])
     p_splits['batters_start'] = p_splits['batters_faced_sp'] / p_splits['games_sp']
     p_splits['er_start'] = p_splits['er_sp'] / p_splits['games_sp']
+    p_splits['ppa'] = p_splits['total_pitches'] / p_splits['games']
     
     p_splits['ppi_sp'] = p_splits['total_pitches_sp'] / (p_splits['outs_sp'] / 3)
     p_splits['ppb_sp'] = p_splits['total_pitches_sp'] / p_splits['batters_faced_sp']
@@ -293,7 +313,7 @@ if not data_path_p.exists():
     p_splits['sb+_rp'] = p_splits['sb_rp'] + p_splits['wild_pitches_rp'] + p_splits['balks_rp']
     p_splits['cs+_rp'] = p_splits['cs_rp'] + p_splits['pickoffs_rp']
     p_splits['ra-_b_rp'] = (p_splits['runners_allowed_rp'] - (p_splits['gidp_rp'] + p_splits['cs+_rp'])) / p_splits['batters_faced_rp']
-    
+  
     
     
     p_splits['ppi_vr'] = p_splits['total_pitches_vr'] / (p_splits['outs_vr'] / 3)

@@ -23,3 +23,6 @@ clean_directory(settings.GAME_DIR, force_delete=True)
 
 
 
+
+
+

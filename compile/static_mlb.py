@@ -244,7 +244,7 @@ team_info = Map({
     'royals': {
         'full_name': 'kansas city royals',
         'mlb_id': 118,
-        'abbreviations': ['kca, kc', 'kcr'],
+        'abbreviations': ['kca, kc', 'kcr', 'kan'],
         'location': 'kansas city',
         'venue': {'id': 7, 'name': 'Kauffman Stadium', 'link': '/api/v1/venues/7'}
         },
