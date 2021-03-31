@@ -391,25 +391,48 @@ class FDSlate:
                      salary += hitter['fd_salary']
                      salary -= r_sal
                      rem_sal = max_sal - salary
+                
                  except(ValueError,KeyError):
-                     cp = p.loc[pi]
-                     cp_sal = cp['fd_salary']
-                     p_sal_filt = (p['fd_salary'] <= (rem_sal + cp_sal))
-                     p_teams = p.loc[pd.keys(), 'team'].values
-                     p_team_filt = (p['team'].isin(p_teams))
-                     h_df = h[h['fd_id'].isin(lineup)]
-                     used_teams=h_df['team'].unique()
-                     p_opp_filt = ((p['opp'] != stack) & (~p['opp'].isin(used_teams)))
-                     rps = p[p_sal_filt & p_team_filt & p_opp_filt] 
-                     n_p = rps.loc[rps['points'].idxmax()]
-                     pi = rps['points'].idxmax()
-                     p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
-                     n_p_id = n_p['fd_id']
-                     n_p_sal = n_p['fd_salary']
-                     salary -= cp_sal
-                     salary += n_p_sal
-                     rem_sal = max_sal - salary
-                     lineup[0] = n_p_id
+                     try:
+                         cp = p.loc[pi]
+                         cp_sal = cp['fd_salary']
+                         p_sal_filt = (p['fd_salary'] <= (rem_sal + cp_sal))
+                         p_teams = p.loc[pd.keys(), 'team'].values
+                         p_team_filt = (p['team'].isin(p_teams))
+                         h_df = h[h['fd_id'].isin(lineup)]
+                         used_teams=h_df['team'].unique()
+                         p_opp_filt = ((p['opp'] != stack) & (~p['opp'].isin(used_teams)))
+                         rps = p[p_sal_filt & p_team_filt & p_opp_filt] 
+                         n_p = rps.loc[rps['points'].idxmax()]
+                         pi = rps['points'].idxmax()
+                         p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
+                         n_p_id = n_p['fd_id']
+                         n_p_sal = n_p['fd_salary']
+                         salary -= cp_sal
+                         salary += n_p_sal
+                         rem_sal = max_sal - salary
+                         lineup[0] = n_p_id
+                     except:
+                         cp = p.loc[pi]
+                         cp_sal = cp['fd_salary']
+                         p_sal_filt = (p['fd_salary'] <= (rem_sal + cp_sal))
+                         h_df = h[h['fd_id'].isin(lineup)]
+                         used_teams=h_df['team'].unique()
+                         p_opp_filt = ((p['opp'] != stack) & (~p['opp'].isin(used_teams)))
+                         rps = p[p_sal_filt & p_team_filt] 
+                         n_p = rps.loc[rps['points'].idxmax()]
+                         pi = rps['points'].idxmax()
+                         p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
+                         n_p_id = n_p['fd_id']
+                         n_p_sal = n_p['fd_salary']
+                         salary -= cp_sal
+                         salary += n_p_sal
+                         rem_sal = max_sal - salary
+                         lineup[0] = n_p_id
+                         if not pitchers.get(pi):
+                             pitchers[pi] = -1
+                         
+                        
             h_id = hitter['fd_id']
             idx = p_map[ps]
             lineup[idx] = h_id
