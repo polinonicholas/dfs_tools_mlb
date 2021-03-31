@@ -133,7 +133,10 @@ class Team(metaclass=IterTeam):
             nri = pd.read_pickle(path)
             return nri
         hydrate = 'person'
-        call = statsapi.get('team_roster', {'teamId': self.id, 'rosterType': 'nonRosterInvitees', 'hydrate': hydrate})['roster']
+        try:
+            call = statsapi.get('team_roster', {'teamId': self.id, 'rosterType': 'nonRosterInvitees', 'hydrate': hydrate})['roster']
+        except KeyError:
+            return []
         nri = []
         if call:
             for p in call:
@@ -1318,3 +1321,4 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
+x = statsapi.get('team_roster', {'teamId': 108, 'rosterType': 'nonRosterInvitees', 'hydrate': 'person'})['roster']
