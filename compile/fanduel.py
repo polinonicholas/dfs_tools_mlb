@@ -221,7 +221,8 @@ class FDSlate:
         i = df[(df['points'] == 0) | (df['team'].isin(self.p_fades))].index
         df.drop(index = i, inplace=True)
         p_drops = df.sort_values(by=['fd_salary'], ascending = False)
-        p_drops = p_drops[p_drops['fd_salary'] > p_drops['fd_salary'].quantile(.75)]
+        p_drops = p_drops[p_drops['fd_salary'] > df['fd_salary'].mean()]
+        print(df['fd_salary'].quantile(.75))
         mp = p_drops['points'].max()
         for x in p_drops.index:
             if p_drops.loc[x, 'points'] == mp:
@@ -276,17 +277,18 @@ class FDSlate:
             }
         max_sal = 35000
         #lineups to build
-        lus = 1
+        lus = 2
         index_track = 0
         while lus > 0:
+            lus -=1
             total_filt = (h['t_count'] >= 75)
             count_filt = (h['ns_count'] >= 50)
-            c_idx = h[total_filt | count_filt]
+            c_idx = h[total_filt | count_filt].index
             h.drop(index=c_idx,inplace=True)
             
             pitchers = {k:v for k,v in pd.items() if v > 0 }
             pi = random.choice(list(pitchers.keys()))
-            pi = 2
+            # pi = 2
             p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
             salary = 0 + p_info[1]
             stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] }
@@ -430,7 +432,7 @@ class FDSlate:
                          rem_sal = max_sal - salary
                          lineup[0] = n_p_id
                          if not pitchers.get(pi):
-                             pitchers[pi] = -1
+                             pd[pi] = -1
                          
                         
             h_id = hitter['fd_id']
@@ -450,21 +452,20 @@ class FDSlate:
             salary -+ replacee['fd_salary']
             rem_sal = max_sal - salary
             lineup[8] = hitter['fd_id']
-            
-        used_players = set()
+        used_players = []
         while sorted(lineup) in sorted_lus:
             h_df = h[h['fd_id'].isin(lineup)]
             used_teams = h_df['team'].unique()
             used_filt = (~h['fd_id'].isin(used_players))
             dupe_filt = (~h['fd_id'].isin(lineup) & (~h['team'].isin(used_teams)))
             replacee = h[h['fd_id'] == lineup[8]]
-            used_players.add(replacee['fd_id'])
+            used_players.append(replacee['fd_id'])
             r_salary = replacee['fd_salary']
             sal_filt = (h['fd_salary'].between((r_salary-200), (rem_sal + r_salary)))
             opp_filt = (h['opp'] != p_info[3])
             hitters = h[dupe_filt & sal_filt & stack_filt & opp_filt & used_filt]
             hitter = hitters.loc[hitters['points'].idxmax()]
-            used_players.add(hitter['fd_id'])
+            used_players.append(hitter['fd_id'])
             salary += hitter['fd_salary']
             salary -+ replacee['fd_salary']
             rem_sal = max_sal - salary
@@ -473,6 +474,7 @@ class FDSlate:
         self.insert_lineup(index_track, lineup)
         index_track += 1
         s[stack] -= 1
+        print(pd)
         pd[pi] -= 1
         lu_filt = (h['fd_id'].isin(lineup))
         h.loc[lu_filt, 't_count'] += 1
@@ -481,36 +483,17 @@ class FDSlate:
 
         
 s=FDSlate()
-
-x = s.build_lineups()
-
-# x.columns.tolist()
-# x.loc[x['points'].idxman()]
-
-s.entries_df().loc[0]
-s.finalize_entries()
-
-# x = ['56054-85253', '56054-13266', '56054-85504', '56054-73832', '56054-60655', '56054-13961', '56054-13540', '56054-79082', '56054-53401']
-# p = sorted(x)
-#  if len(p[(p['fd_id'].isin(lineup)) & (p['team'] == (p_info[3]))].index) < 2:
-    
-# x = ['56054-16956',
-#  '56054-79082',
-#  '56054-13262',
-#  '56054-13929',
-#  '56054-79393',
-#  '56054-146160',
-#  '56054-21609',
-#  '56054-53401',
-#  '56054-13540']
-
-# h = s.h_df()
-
-# p =h.loc[h['fd_id'].isin(x) , ['name', 'fd_salary', 'team', 'opp']]
-# p['fd_salary'].sum()
+# s.get_pitchers()
+# s.get_hitters()
+# s.build_lineups()
+# s.finalize_entries()
 
 p = s.p_lu_df()
-len(p['lus'].unique())
-# p.loc[54]
+
+p[['name', 'lus', 'points', 'p_z', 'fd_salary', 'exp_ps_raw', 'lu_mu']]
 p['lus'].sum()
-# p.loc[p['fd_id'] == '56054-16956', 'fd_salary']
+test = s.stacks_df()
+test[['stacks', 'raw_points', 'salary']]
+test.columns.tolist()
+
+

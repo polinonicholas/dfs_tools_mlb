@@ -871,14 +871,14 @@ class Team(metaclass=IterTeam):
             print('Getting default SP stats.')
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
-        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum()
+        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
         p_df['venue_points'] = p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)
         p_df['temp_points'] = p_df['exp_ps_raw'] * (-self.temp_boost % 2)
         p_df['ump_points'] = p_df['exp_ps_raw'] * (-self.ump_boost % 2)
         p_df['points'] = \
             (p_df['venue_points'] * self.fd_weights['venue_p']) + \
                 (p_df['temp_points'] * self.fd_weights['temp_p']) + (p_df['ump_points'] * self.fd_weights['ump_p'])
-        p_df['lu_mu'] = h_df['exp_pc_sp_raw'].sum()
+        
         if self.name in daily_info['confirmed_sp']:
             with open(file, "wb") as f:
                 pickle.dump(p_df, f)
@@ -1320,5 +1320,3 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
-x = statsapi.get('team_roster', {'teamId': 108, 'rosterType': 'nonRosterInvitees', 'hydrate': 'person'})['roster']
