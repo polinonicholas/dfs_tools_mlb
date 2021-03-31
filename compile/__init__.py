@@ -13,14 +13,8 @@ clean_directory(settings.NRI_DIR)
 clean_directory(settings.ROSTER_DIR)
 clean_directory(settings.DEPTH_DIR)
 clean_directory(settings.GAME_DIR, force_delete=True)
-
-
-
-
-
-
-
-
+clean_directory(settings.GAME_DIR, force_delete=True)
+clean_directory(settings.SCHED_DIR, force_delete=True)
 
 
 

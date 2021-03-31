@@ -20,6 +20,7 @@ import pickle
 import datetime
 from dfs_tools_mlb import settings
 from math import floor, ceil
+from pathlib import Path
 from dfs_tools_mlb.dataframes.stat_splits import (h_splits, p_splits, h_q, h_q_vr,
                                                   h_q_vl, p_q_rp, p_q_sp, p_q_vl,
                                                   p_q_vr, p_q)
@@ -300,7 +301,23 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def all_games(self):
-        return full_schedule(team=self.id, start_date=cs.spring_start, end_date=cs.playoff_end)
+        file = pickle_path(name=f"{self.name}_schedule_{tf.today}", directory=settings.SCHED_DIR)
+        path = settings.SCHED_DIR.joinpath(file)
+        if path.exists():
+            schedule = pd.read_pickle(path)
+        else:
+            schedule = full_schedule(team=self.id, start_date=cs.spring_start, end_date=cs.playoff_end)
+            with open(file, "wb") as f:
+                pickle.dump(schedule, f)
+        return schedule
+    def clear_team_cache(self, directories):
+        for d in directories:
+            for file in Path.iterdir(d):
+                if not file.is_dir() and self.name in str(file):
+                    file.unlink()
+        return f"Cleared cache for {self.name}."
+            
+        
     
     @cached_property
     def future_games(self):
@@ -329,13 +346,19 @@ class Team(metaclass=IterTeam):
     @cached_property
     def next_game(self):
         if self.next_game_pk:
-            print(f"Getting boxscore for {self.name.capitalize()}' next game.")
-            return statsapi.get('game', {'gamePk': self.next_game_pk})
+            file = pickle_path(name=f"{self.name}_next_game_{tf.today}", directory=settings.GAME_DIR)
+            path = settings.GAME_DIR.joinpath(file)
+            if path.exists():
+                game = pd.read_pickle(path) 
+            else:
+                print(f"Getting boxscore for {self.name.capitalize()}' next game.")
+                game = statsapi.get('game', {'gamePk': self.next_game_pk})
+            return game
         return self.next_game_pk
     
     @cached_property
     def last_game(self):
-        file = pickle_path(name=f"{self.name}_game_{tf.today}", directory=settings.GAME_DIR)
+        file = pickle_path(name=f"{self.name}_last_game_{tf.today}", directory=settings.GAME_DIR)
         path = settings.GAME_DIR.joinpath(file)
         if path.exists():
             game = pd.read_pickle(path)
@@ -400,14 +423,19 @@ class Team(metaclass=IterTeam):
     @cached_property
     def opp_sp(self):
         if self.next_game_pk:
+            daily_info = Team.daily_info()
+            if self.opp_name not in daily_info['confirmed_sp']:
+                self.del_next_game()
             try:
                 sp_id = 'ID' + str(self.next_game['gameData']['probablePitchers'][self.opp_ha]['id'])
                 sp_info = self.next_game['gameData']['players'][sp_id]
                 daily_info = Team.daily_info()
-                daily_info["confirmed_sp"].append(self.opp_name)
-                file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                with open(file, "w+") as f:
-                    json.dump(daily_info, f)
+                if self.opp_name not in daily_info["confirmed_sp"]:
+                    daily_info["confirmed_sp"].append(self.opp_name)
+                    file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
+                    with open(file, "w+") as f:
+                        json.dump(daily_info, f)
+                self.opp_instance.cache_next_game()
                 return sp_info
             except KeyError:
                 starters = self.opp_instance.rested_sp
@@ -424,14 +452,18 @@ class Team(metaclass=IterTeam):
         return self.next_game_pk
     def projected_sp(self):
         if self.next_game_pk:
+            daily_info = Team.daily_info()
+            if self.name not in daily_info['confirmed_sp']:
+                self.del_next_game()
             try:
                 sp_id = 'ID' + str(self.next_game['gameData']['probablePitchers'][self.ha]['id'])
                 sp_info = self.next_game['gameData']['players'][sp_id]
-                daily_info = Team.daily_info()
-                daily_info["confirmed_sp"].append(self.name)
-                file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                with open(file, "w+") as f:
-                    json.dump(daily_info, f)
+                if self.name not in daily_info["confirmed_sp"]:
+                    daily_info["confirmed_sp"].append(self.name)
+                    file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
+                    with open(file, "w+") as f:
+                        json.dump(daily_info, f)
+                self.cache_next_game()
                 return sp_info
             except KeyError:
                 starters = self.rested_sp
@@ -536,13 +568,17 @@ class Team(metaclass=IterTeam):
                 lineup =  Team.lineups[self.name][self.opp_sp_hand]
                 if len(lineup) == 9:
                     return lineup
+            if self.name not in daily_info["confirmed_lu"]:
+                self.del_next_game()
             lineup = self.next_game['liveData']['boxscore']['teams'][self.ha]['battingOrder']
             if len(lineup) == 9:
                 self.update_lineup(lineup, self.opp_sp_hand)
-                daily_info["confirmed_lu"].append(self.name)
-                file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                with open(file, "w+") as f:
-                    json.dump(daily_info, f)
+                if self.name not in daily_info["confirmed_lu"]:
+                    daily_info["confirmed_lu"].append(self.name)
+                    file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
+                    with open(file, "w+") as f:
+                        json.dump(daily_info, f)
+                self.cache_next_game()
                 return lineup
             else:
                 return self.projected_lineup
@@ -627,8 +663,9 @@ class Team(metaclass=IterTeam):
         file = pickle_path(name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR)
         path = settings.LINEUP_DIR.joinpath(file)
         daily_info = Team.daily_info()
+        if self.name not in daily_info["confirmed_lu"]:
+            self.del_props()
         if not path.exists() or self.name not in daily_info["confirmed_lu"]:
-            
             lineup_ids = self.lineup
             lineup = pd.DataFrame(lineup_ids, columns= ["mlb_id"])
             roster = pd.DataFrame(self.full_roster)
@@ -731,6 +768,8 @@ class Team(metaclass=IterTeam):
             h_df.loc[righties, 'sp_mu'] = p_df['fd_wpa_b_vr'].max()
             #points conceded
             key = 'fd_wpa_pa_' + self.o_split
+            p_df.loc[(p_df['batters_faced_vr'] < 100) | (p_df['fd_wps_b_vr'].isna()), 'fd_wps_b_vr'] = p_q_vr['fd_wps_b_vr'].median()
+            p_df.loc[(p_df['batters_faced_vl'] < 100) | (p_df['fd_wps_b_vl'].isna()), 'fd_wps_b_vl'] = p_q_vl['fd_wps_b_vl'].median()
             h_df.loc[lefties, 'exp_pc_sp'] = ((p_df['fd_wps_b_vl'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
             h_df.loc[righties, 'exp_pc_sp'] = ((p_df['fd_wps_b_vr'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
             h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
@@ -763,12 +802,17 @@ class Team(metaclass=IterTeam):
                 exp_bf_bp -= 1
             h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * ((bp['fd_wpa_b_rp'].mean() + h_df['fd_wps_pa']) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
+            self.raw_points = h_df['exp_ps_raw'].sum()
+            self.venue_points = self.raw_points * self.next_venue_boost
+            self.temp_points = self.raw_points * self.temp_boost
+            self.ump_points = self.raw_points * self.ump_boost
+            w = self.fd_weights
+            self.points = (self.venue_points * w['venue_h']) + (self.temp_points * w['temp_h']) + (self.temp_points * w['ump_h'])
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
             h_df['venue_points'] = h_df['exp_ps_raw'] * self.next_venue_boost
             h_df['temp_points'] = h_df['exp_ps_raw'] * self.temp_boost
             h_df['ump_points'] = h_df['exp_ps_raw'] * self.ump_boost
-            h_df['points'] = (h_df['venue_points'] * self.fd_weights['venue_h']) + \
-                (h_df['temp_points'] * self.fd_weights['temp_h']) + (h_df['ump_points'] * self.fd_weights['ump_h'])
+            h_df['points'] = (h_df['venue_points'] * w['venue_h']) + (h_df['temp_points'] * w['temp_h']) + (h_df['ump_points'] * w['ump_h'])
             with open(file, "wb") as f:
                 pickle.dump(h_df, f)
         else:
@@ -776,9 +820,15 @@ class Team(metaclass=IterTeam):
             h_df['venue_points'] = h_df['exp_ps_raw'] * self.next_venue_boost
             h_df['temp_points'] = h_df['exp_ps_raw'] * self.temp_boost
             h_df['ump_points'] = h_df['exp_ps_raw'] * self.ump_boost
-            h_df['points'] = (h_df['venue_points'] * self.fd_weights['venue_h']) + \
-                (h_df['temp_points'] * self.fd_weights['temp_h']) + (h_df['ump_points'] * self.fd_weights['ump_h'])
+            w = self.fd_weights
+            h_df['points'] = (h_df['venue_points'] * w['venue_h']) + \
+                (h_df['temp_points'] * w['temp_h']) + (h_df['ump_points'] * w['ump_h'])
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
+            self.raw_points = h_df['exp_ps_raw'].sum()
+            self.venue_points = self.raw_points * self.next_venue_boost
+            self.temp_points = self.raw_points * self.temp_boost
+            self.ump_points = self.raw_points * self.ump_boost
+            self.points = (self.venue_points * w['venue_h']) + (self.temp_points * w['temp_h']) + (self.temp_points * w['ump_h'])
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
         
         return h_df
@@ -815,6 +865,7 @@ class Team(metaclass=IterTeam):
                           }
             p_df = pd.DataFrame([player]).join(p_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
         except TypeError:
+            print('Getting default SP stats.')
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
         p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum()
@@ -919,13 +970,13 @@ class Team(metaclass=IterTeam):
                 projected_official = next(x for x in officials if x['officialType'] == ump_type)
                 return projected_official['official']['id']
             except StopIteration:
-                return 'Unable to project umpire.'
-        if self.is_new_series:
+                return None
+        if not self.is_new_series:
             return (get_official(self.last_game, 'First Base'))
         elif self.next_game['liveData']['boxscore']['officials']:
             return (get_official(self.next_game,'Home Plate'))
         else:
-            return 'Unable to project umpire.'
+            return None
     
     @cached_property
     def projected_ump_data(self):
@@ -1013,9 +1064,10 @@ class Team(metaclass=IterTeam):
             if condition in mac.weather.rain:
                 file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
                 daily_info = Team.daily_info
-                daily_info["rain"].append(self.name)
-                with open(file, "w+") as f:
-                    json.dump(daily_info, f)
+                if self.name not in daily_info["rain"]:
+                    daily_info["rain"].append(self.name)
+                    with open(file, "w+") as f:
+                        json.dump(daily_info, f)
         return condition
     @cached_property
     def venue_temp(self):
@@ -1086,7 +1138,7 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        if len(self.next_venue_data.index) >= 100:
+        if len(self.next_venue_data.index) < 100:
             return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
     @cached_property
@@ -1147,43 +1199,42 @@ class Team(metaclass=IterTeam):
                 return team
     @cached_property
     def fd_weights(self):
-        if self.weather:
-            if self.is_new_series:
-                return {
-                    'venue_p': .40,
-                    'temp_p': .60,
-                    'ump_p': 0,
-                    'venue_h': .60,
-                    'temp_h': .40,
-                    'ump_h': 0
-                    }
-            else:
-                return {
-                    'venue_p': .40,
-                    'temp_p': .50,
-                    'ump_p': .10,
-                    'venue_h': .50,
-                    'temp_h': .40,
-                    'ump_h': .10
-                    }
+        if self.weather and self.projected_ump:
+            return {
+            'venue_p': .40,
+            'temp_p': .50,
+            'ump_p': .10,
+            'venue_h': .50,
+            'temp_h': .40,
+            'ump_h': .10
+            }
+            
+        elif self.weather:
+            return {
+            'venue_p': .50,
+            'temp_p': .50,
+            'ump_p': .0,
+            'venue_h': .50,
+            'temp_h': .50,
+            'ump_h': .0
+            }
+        elif self.projected_ump:
+            return {
+                'venue_p': .70,
+                'temp_p': .0,
+                'ump_p': .30,
+                'venue_h': .75,
+                'temp_h': .0,
+                'ump_h': .25
+                }
         else:
-            if self.is_new_series:
-                return {
+            return {
                     'venue_p': 1,
                     'temp_p': 0,
                     'ump_p': 0,
                     'venue_h': 1,
                     'temp_h': 0,
                     'ump_h': 0
-                    }
-            else:
-                return {
-                    'venue_p': .75,
-                    'temp_p': 0,
-                    'ump_p': .25,
-                    'venue_h': .85,
-                    'temp_h': 0,
-                    'ump_h': .15
                     }
     @cached_property
     def rested_sp(self):
@@ -1207,9 +1258,35 @@ class Team(metaclass=IterTeam):
             starters = self.starter
             return starters[~starters['mlb_id'].isin(recent_sp)]
         return set()
-            
-      
-       
+    def del_props(self):
+        try:
+            del self.next_game
+        except AttributeError:
+            pass
+        try:
+            del self.lineupl
+        except AttributeError:
+            pass
+        
+        return None
+    def del_next_game(self):
+        try:
+            del self.next_game
+        except AttributeError:
+            pass  
+        return None
+    def cache_next_game(self):
+        file = pickle_path(name=f"{self.name}_next_game_{tf.today}", directory=settings.GAME_DIR)
+        path = settings.GAME_DIR.joinpath(file)
+        if not path.exists() and self.weather:
+            di = Team.daily_info()
+            n = self.name
+            if n in di["confirmed_lu"] and n in di["confirmed_sp"]:
+                game = self.next_game
+                with open(file, "wb") as f:
+                    pickle.dump(game, f)
+                print(f"Cached {self.name} next game.")
+        return None      
 athletics = Team(mlb_id = 133, name = 'athletics')
 pirates = Team(mlb_id = 134, name = 'pirates')
 padres = Team(mlb_id = 135, name = 'padres')
@@ -1240,52 +1317,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
-
-# bullpen = self.rested_bullpen
-#                     try:
-#                         projected_sp = bullpen.loc[bullpen['batters_faced_sp'].idxmax()]
-#                     except ValueError:
-#                         projected_sp = bullpen.loc[bullpen['ppa'].idxmax()]
-# pirates = pirates.rested_bullpen
-# twins = twins.rested_bullpen
-
-
-
-# pirates.loc[pirates['batters_faced_sp'].idxmax()]
-# twins.opp_name
-# r = royals.sp_df()
-# r['team']
-dodgers
-test = dodgers.sp_df()
-test['points']
-["cubs", "orioles", "reds", "mariners"]
-
-padres.weather
-white_sox.starter[['name','fd_wps_b', 'age']]
-cubs.starter[['name','fd_wps_b', 'age']]
-cardinals.starter[['name','fd_wps_b', 'age']]
-brewers.starter[['name','fd_wps_b', 'age']]
-
-padres.starter[['name','fd_wps_b', 'age']]
-
-dodgers.starter[['name','fd_wps_b', 'age']]
-
-
-
-white_sox.bullpen[['name','fd_wps_b', 'age', 'batters_faced']]
-cubs.bullpen[['name','fd_wps_b', 'age', 'batters_faced']]
-cardinals.bullpen[['name','fd_wps_b', 'age', 'batters_faced']]
-
-cardinals.bullpen
-p_q['fd_wps_b'].median()
-
-white_sox.lineup_df()
-
-historical_data['']
-
-white_sox.next_game
-del white_sox.next_game
-
-del self.next_game
 

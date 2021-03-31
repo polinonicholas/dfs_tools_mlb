@@ -15,6 +15,8 @@ ROSTER_DIR = Path(STORAGE_DIR, 'rosters').resolve()
 NRI_DIR = Path(STORAGE_DIR, 'nri').resolve()
 GAME_DIR = Path(STORAGE_DIR, 'recent_games').resolve()
 FD_DIR = Path(STORAGE_DIR, 'fd_entries').resolve()
+SCHED_DIR = Path(STORAGE_DIR, 'schedules').resolve()
+
 
 DL_FOLDER = "C:/Users/nicho/Downloads"
 FD_FILE_MATCH = DL_FOLDER + "/FanDuel-MLB*entries-upload-template*"
