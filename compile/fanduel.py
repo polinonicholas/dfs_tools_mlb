@@ -222,7 +222,6 @@ class FDSlate:
         df.drop(index = i, inplace=True)
         p_drops = df.sort_values(by=['fd_salary'], ascending = False)
         p_drops = p_drops[p_drops['fd_salary'] > df['fd_salary'].mean()]
-        print(df['fd_salary'].quantile(.75))
         mp = p_drops['points'].max()
         for x in p_drops.index:
             if p_drops.loc[x, 'points'] == mp:
@@ -252,12 +251,24 @@ class FDSlate:
     def build_lineups(self):
         # all hitters in slate
         h = self.h_df()
+        h_fade_filt = (h['team'].isin(self.h_fades))
+        hfi = h[h_fade_filt].index
+        h.drop(index=hfi,inplace=True)
         #count each players entries
         h['t_count'] = 0
         #count non_stack
         h['ns_count'] = 0
+        h_count_df = h.copy()
+        plat_filt = (h['is_platoon'] == True)
+        h.loc[plat_filt, 't_count'] = 74
+        h.loc[plat_filt, 'ns_count'] = 49
         #all pitchers...
         p = self.p_df()
+        p_fade_filt = (p['team'].isin(self.p_fades))
+        pfi = p[p_fade_filt].index
+        p.drop(index=pfi,inplace=True)
+        p_count_df = p.copy()
+        p_count_df['t_count'] = 0
         #dict p_df.index: p_df: lineups to be in
         pd = self.p_lu_df()['lus'].to_dict()
         # team: stacks to build
@@ -346,8 +357,6 @@ class FDSlate:
             for k, v in stack_map.items():
                 idx = p_map[k]
                 lineup[idx] = v[1]  
-           
-        
             np = [idx for idx, spot in enumerate(lineup) if not spot]
             needed_pos = [x for x, y in p_map.items() if y in np]
             random.shuffle(needed_pos)
@@ -525,18 +534,22 @@ class FDSlate:
             h.loc[lu_filt, 't_count'] += 1
             h.loc[lu_filt & stack_filt, 'ns_count'] += 1
             print(lus)
+            h_count_df.loc[(h_count_df['fd_id'].isin(lineup)), 't_count'] += 1
+            p_count_df.loc[(p_count_df['fd_id']) == lineup[0], 't_count'] += 1
+        h_count_file = pickle_path(name=f"h_counts_{tf.today}_{self.slate_number}", directory=settings.FD_DIR)   
+        p_count_file = pickle_path(name=f"p_counts_{tf.today}_{self.slate_number}", directory=settings.FD_DIR)
+        with open(h_count_file, "wb") as f:
+                pickle.dump(h_count_df, f)
+        with open(p_count_file, "wb") as f:
+                pickle.dump(p_count_df, f)
+        print(h_count_df.loc[h_count_df['t_count'].nlargest(50).index, ['name', 't_count']])
+        print(p_count_df.loc[p_count_df['t_count'].nlargest(50).index, ['name', 't_count']])
         return sorted_lus
 
-        
-s=FDSlate()
+       
+s=FDSlate(h_fades=['red sox', 'orioles'], p_fades=['red sox', 'orioles'])
 # s.get_pitchers()
 # s.get_hitters()
-s.build_lineups()
-s.finalize_entries()
+# s.build_lineups()
+# s.finalize_entries()
 
-
-
-p = s.p_lu_df()
-p[['lus', 'name', 'points', 'fd_salary']]
-h = s.stacks_df()
-h['stacks']

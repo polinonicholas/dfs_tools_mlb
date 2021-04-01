@@ -753,17 +753,26 @@ class Team(metaclass=IterTeam):
                 p_df = pd.DataFrame([player]).join(p_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
             except TypeError:
                 p_df = Team.default_sp()
+            lefties = (h_df['bat_side'] == 'L')
+            righties = (h_df['bat_side'] == 'R')
+            l_len = len(h_df[lefties].index)
+            r_len = len(h_df[righties].index)
+            l_weight = l_len / 9
+            r_weight = r_len / 9
+            p_df.loc[(p_df['batters_faced_sp'] < 100) | (p_df['ppb_sp'].isna()), 'ppb_sp'] = p_q['ppb_sp'].mean()
+            p_df.loc[(p_df['batters_faced_vl'] < 100) | (p_df['ppb_vl'].isna()), 'ppb_vl'] = p_q_vl['ppb_vl'].mean()
+            p_df.loc[(p_df['batters_faced_vr'] < 100) | (p_df['ppb_vr'].isna()), 'ppb_vr'] = p_q_vr['ppb_vr'].mean()
+            p_ppb = ((l_weight * p_df['ppb_vl'].max()) + (r_weight * p_df['ppb_vr'].max())) * 9 
             p_df['pitches_start'].fillna(p_q_sp['pitches_start'].median(), inplace = True)
             key = 'pitches_pa_' + self.o_split
-            p_df['exp_x_lu'] = p_df['pitches_start'] / h_df[key].sum()
+            p_df['exp_x_lu'] = p_df['pitches_start'] / ((h_df[key].sum() + p_ppb) / 2)
             p_df['exp_bf'] = round((p_df['exp_x_lu'] * 9))
             sp_rollover = floor((p_df['exp_x_lu'] % 1) * 9)
             h_df.loc[h_df['order'] <= sp_rollover, 'exp_pa_sp'] = ceil(p_df['exp_x_lu'])
             h_df.loc[h_df['order'] > sp_rollover, 'exp_pa_sp'] = floor(p_df['exp_x_lu'])
             p_df.loc[(p_df['batters_faced_vr'] < 100) | (p_df['fd_wpa_b_vr'].isna()), 'fd_wpa_b_vr'] = p_q_vr['fd_wpa_b_vr'].median()
             p_df.loc[(p_df['batters_faced_vl'] < 100) | (p_df['fd_wpa_b_vl'].isna()), 'fd_wpa_b_vl'] = p_q_vl['fd_wpa_b_vl'].median()
-            lefties = (h_df['bat_side'] == 'L')
-            righties = (h_df['bat_side'] == 'R')
+            
             key = 'fd_wps_pa_' + self.o_split
             h_df.loc[lefties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vl'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
             h_df.loc[righties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vr'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
@@ -778,12 +787,13 @@ class Team(metaclass=IterTeam):
             h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
             p_df.loc[(p_df['batters_faced_vr'] < 100) | (p_df['ra-_b_vr'].isna()), 'ra-_b_vr'] = p_q_vr['ra-_b_vr'].median()
             p_df.loc[(p_df['batters_faced_vl'] < 100) | (p_df['ra-_b_vl'].isna()), 'ra-_b_vl'] = p_q_vl['ra-_b_vl'].median()
+            
             exp_pa_r_sp = h_df.loc[righties, 'exp_pa_sp'].sum()
             exp_pa_l_sp = h_df.loc[lefties, 'exp_pa_sp'].sum()
             p_df['exp_ra'] = floor((exp_pa_r_sp * p_df['ra-_b_vr'].max()) + (exp_pa_l_sp * p_df['ra-_b_vl'].max()))
             p_df['exp_inn'] = (p_df['exp_bf'].max() - p_df['exp_ra'].max()) / 3
             if self.is_home:
-                exp_bp_inn = 8.75 - p_df['exp_inn'].max()
+                exp_bp_inn = 9 - p_df['exp_inn'].max()
             else:
                 exp_bp_inn = 9 - p_df['exp_inn'].max()
             bp = self.proj_opp_bp
@@ -1320,3 +1330,5 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
+
