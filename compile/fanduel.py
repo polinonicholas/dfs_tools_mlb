@@ -247,6 +247,23 @@ class FDSlate:
         i = df[df['lus'] == 0].index
         df.drop(index = i, inplace=True)
         return df
+    def p_counts(self):
+        file = pickle_path(name=f"p_counts_{tf.today}_{self.slate_number}", directory=settings.FD_DIR)
+        path = settings.FD_DIR.joinpath(file)
+        if path.exists():
+            df = pd.read_pickle(path)
+            return df
+        else:
+            return "No pitchers stored yet."
+    def h_counts(self):
+        file = pickle_path(name=f"h_counts_{tf.today}_{self.slate_number}", directory=settings.FD_DIR)
+        path = settings.FD_DIR.joinpath(file)
+        if path.exists():
+            df = pd.read_pickle(path)
+            return df
+        else:
+            return "No lineups stored yet."
+        
     
     def build_lineups(self):
         # all hitters in slate
@@ -260,8 +277,8 @@ class FDSlate:
         h['ns_count'] = 0
         h_count_df = h.copy()
         plat_filt = (h['is_platoon'] == True)
-        h.loc[plat_filt, 't_count'] = 74
-        h.loc[plat_filt, 'ns_count'] = 49
+        h.loc[plat_filt, 't_count'] = 65
+        h.loc[plat_filt, 'ns_count'] = 40
         #all pitchers...
         p = self.p_df()
         p_fade_filt = (p['team'].isin(self.p_fades))
@@ -296,7 +313,6 @@ class FDSlate:
             count_filt = (h['ns_count'] >= 50)
             c_idx = h[total_filt | count_filt].index
             h.drop(index=c_idx,inplace=True)
-            
             pitchers = {k:v for k,v in pd.items() if v > 0 }
             pi = random.choice(list(pitchers.keys()))
             # pi = 2
@@ -467,7 +483,7 @@ class FDSlate:
                                 
                                  
                              
-                            
+               
                 h_id = hitter['fd_id']
                 idx = p_map[ps]
                 lineup[idx] = h_id
@@ -542,8 +558,6 @@ class FDSlate:
                 pickle.dump(h_count_df, f)
         with open(p_count_file, "wb") as f:
                 pickle.dump(p_count_df, f)
-        print(h_count_df.loc[h_count_df['t_count'].nlargest(50).index, ['name', 't_count']])
-        print(p_count_df.loc[p_count_df['t_count'].nlargest(50).index, ['name', 't_count']])
         return sorted_lus
 
        
@@ -553,3 +567,23 @@ s=FDSlate(h_fades=['red sox', 'orioles'], p_fades=['red sox', 'orioles'])
 # s.build_lineups()
 # s.finalize_entries()
 
+
+# p_lu_df = s.p_lu_df()
+# p_lu_index = p_lu_df['lus'].nlargest(60).index
+# p_lu = p_lu_df.loc[p_lu_index, ['name', 'lus']]
+
+# h_stack_df = s.stacks_df()
+# h_stacks = h_stack_df['stacks'].nlargest(60)
+
+
+# pc_df = s.p_counts()
+# pc_index = pc_df['t_count'].nlargest(60).index
+# pc = pc_df.loc[pc_index, ['name', 't_count']]
+# pc_team_filt = (pc_df['team'] == '')
+# pc_team = pc_df.loc[pc_team_filt, 'name']
+
+# hc_df = s.h_counts()
+# hc_index = hc_df['t_count'].nlargest(60).index
+# hc = hc_df.loc[hc_index, ['name', 't_count']]
+# hc_team_filt = (hc_df['team'] == '')
+# hc_team = hc_df.loc[hc_team_filt, 'name']
