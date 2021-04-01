@@ -499,15 +499,14 @@ class FDSlate:
                 rem_sal = max_sal - salary
                 lineup[8] = hitter['fd_id']
             used_players = []
-            while sorted(lineup) in sorted_lus:
+            while sorted(lineup) in sorted_lus or len(used_teams) < 3:
                 h_df = h[h['fd_id'].isin(lineup)]
                 used_teams = h_df['team'].unique()
                 used_filt = (~h['fd_id'].isin(used_players))
-                dupe_filt = (~h['fd_id'].isin(lineup) & (~h['team'].isin(used_teams)))
+                dupe_filt = (~h['fd_id'].isin(lineup))
                 replacee = h[h['fd_id'] == lineup[8]]
                 used_players.append(replacee['fd_id'])
                 r_salary = replacee['fd_salary'].item()
-                
                 sal_filt = (h['fd_salary'] <= (rem_sal + r_salary))
                 opp_filt = (h['opp'] != p_info[3])
                 hitters = h[dupe_filt & sal_filt & stack_filt & opp_filt & used_filt]
@@ -539,3 +538,5 @@ s.finalize_entries()
 
 p = s.p_lu_df()
 p[['lus', 'name', 'points', 'fd_salary']]
+h = s.stacks_df()
+h['stacks']
