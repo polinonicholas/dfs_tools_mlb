@@ -317,3 +317,6 @@ random.sample(stack_ids, 3)
 x = {}
 x = {'diamondbacks': 15.0, 'indians': 20.0, 'rockies': 9.0, 'tigers': 13.0, 'rangers': 13.0, 'pirates': 37.0, 'cubs': 31.0}
 stack = random.choice(list(x.keys()))
+
+x = {'diamondbacks': 6.0, 'indians': 6.0, 'tigers': 1.0, 'pirates': 23.0, 'cubs': 17.0}
+max(x.values())

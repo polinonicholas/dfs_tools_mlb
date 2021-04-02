@@ -1324,23 +1324,3 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
-
-r = royals.lineup_df()
-r['venue_points'].sum()
-x = rangers.lineup_df()
-x['points'].sum()
-cubs.ump_boost
-royals.ump_boost
-royals.is_new_series
-royals.projected_ump
-royals.home_venue
-p.columns.tolist()
-p = pirates.lineup_df()
-p['venue_points'].sum()
-rangers.raw_points
-cubs.raw_points
-
-dodgers.raw_points
-
-phillies.sp_df().columns.tolist()
