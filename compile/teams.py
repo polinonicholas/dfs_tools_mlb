@@ -816,32 +816,30 @@ class Team(metaclass=IterTeam):
             h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * ((bp['fd_wpa_b_rp'].mean() + h_df['fd_wps_pa']) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
             self.raw_points = h_df['exp_ps_raw'].sum()
-            self.venue_points = self.raw_points * self.next_venue_boost
-            self.temp_points = self.raw_points * self.temp_boost
-            self.ump_points = self.raw_points * self.ump_boost
-            w = self.fd_weights
-            self.points = (self.venue_points * w['venue_h']) + (self.temp_points * w['temp_h']) + (self.temp_points * w['ump_h'])
+            self.venue_points = (self.raw_points * self.next_venue_boost) - self.raw_points
+            self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
+            self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
+            self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
-            h_df['venue_points'] = h_df['exp_ps_raw'] * self.next_venue_boost
-            h_df['temp_points'] = h_df['exp_ps_raw'] * self.temp_boost
-            h_df['ump_points'] = h_df['exp_ps_raw'] * self.ump_boost
-            h_df['points'] = (h_df['venue_points'] * w['venue_h']) + (h_df['temp_points'] * w['temp_h']) + (h_df['ump_points'] * w['ump_h'])
+            h_df['venue_points'] = (h_df['exp_ps_raw'] * self.next_venue_boost) - h_df['exp_ps_raw']
+            h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
+            h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
+            h_df['points'] = h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points'] + h_df['exp_ps_raw']
+            
             with open(file, "wb") as f:
                 pickle.dump(h_df, f)
         else:
             h_df = pd.read_pickle(path)
-            h_df['venue_points'] = h_df['exp_ps_raw'] * self.next_venue_boost
-            h_df['temp_points'] = h_df['exp_ps_raw'] * self.temp_boost
-            h_df['ump_points'] = h_df['exp_ps_raw'] * self.ump_boost
-            w = self.fd_weights
-            h_df['points'] = (h_df['venue_points'] * w['venue_h']) + \
-                (h_df['temp_points'] * w['temp_h']) + (h_df['ump_points'] * w['ump_h'])
+            h_df['venue_points'] = (h_df['exp_ps_raw'] * self.next_venue_boost) - h_df['exp_ps_raw']
+            h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
+            h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
+            h_df['points'] = h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points'] + h_df['exp_ps_raw']
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
             self.raw_points = h_df['exp_ps_raw'].sum()
-            self.venue_points = self.raw_points * self.next_venue_boost
-            self.temp_points = self.raw_points * self.temp_boost
-            self.ump_points = self.raw_points * self.ump_boost
-            self.points = (self.venue_points * w['venue_h']) + (self.temp_points * w['temp_h']) + (self.temp_points * w['ump_h'])
+            self.venue_points = (self.raw_points * self.next_venue_boost) - self.raw_points
+            self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
+            self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
+            self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
         
         return h_df
@@ -854,12 +852,10 @@ class Team(metaclass=IterTeam):
         path = settings.SP_DIR.joinpath(file)
         if path.exists():
             p_df = pd.read_pickle(path)
-            p_df['venue_points'] = p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)
-            p_df['temp_points'] = p_df['exp_ps_raw'] * (-self.temp_boost % 2)
-            p_df['ump_points'] = p_df['exp_ps_raw'] * (-self.ump_boost % 2)
-            p_df['points'] = \
-                (p_df['venue_points'] * self.fd_weights['venue_p']) + \
-                    (p_df['temp_points'] * self.fd_weights['temp_p']) + (p_df['ump_points'] * self.fd_weights['ump_p'])
+            p_df['venue_points'] = (p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)) - p_df['exp_ps_raw']
+            p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
+            p_df['ump_points'] = (p_df['exp_ps_raw'] * (-self.ump_boost % 2)) - p_df['exp_ps_raw']
+            p_df['points'] = p_df['exp_ps_raw'] + p_df['venue_points'] + p_df['temp_points'] + p_df['ump_points']
             return p_df
         try:
             p_info = projected_sp
@@ -882,12 +878,10 @@ class Team(metaclass=IterTeam):
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
         p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
-        p_df['venue_points'] = p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)
-        p_df['temp_points'] = p_df['exp_ps_raw'] * (-self.temp_boost % 2)
-        p_df['ump_points'] = p_df['exp_ps_raw'] * (-self.ump_boost % 2)
-        p_df['points'] = \
-            (p_df['venue_points'] * self.fd_weights['venue_p']) + \
-                (p_df['temp_points'] * self.fd_weights['temp_p']) + (p_df['ump_points'] * self.fd_weights['ump_p'])
+        p_df['venue_points'] = (p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)) - p_df['exp_ps_raw']
+        p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
+        p_df['ump_points'] = (p_df['exp_ps_raw'] * (-self.ump_boost % 2)) - p_df['exp_ps_raw']
+        p_df['points'] = p_df['exp_ps_raw'] + p_df['venue_points'] + p_df['temp_points'] + p_df['ump_points']
         
         if self.name in daily_info['confirmed_sp']:
             with open(file, "wb") as f:
@@ -983,13 +977,13 @@ class Team(metaclass=IterTeam):
                 projected_official = next(x for x in officials if x['officialType'] == ump_type)
                 return projected_official['official']['id']
             except StopIteration:
-                return None
+                return 'Unable to project ump.'
         if not self.is_new_series:
             return (get_official(self.last_game, 'First Base'))
         elif self.next_game['liveData']['boxscore']['officials']:
             return (get_official(self.next_game,'Home Plate'))
         else:
-            return None
+            return 'Unable to project ump.'
     
     @cached_property
     def projected_ump_data(self):
@@ -1330,3 +1324,23 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
+
+r = royals.lineup_df()
+r['venue_points'].sum()
+x = rangers.lineup_df()
+x['points'].sum()
+cubs.ump_boost
+royals.ump_boost
+royals.is_new_series
+royals.projected_ump
+royals.home_venue
+p.columns.tolist()
+p = pirates.lineup_df()
+p['venue_points'].sum()
+rangers.raw_points
+cubs.raw_points
+
+dodgers.raw_points
+
+phillies.sp_df().columns.tolist()
