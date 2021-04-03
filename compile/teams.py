@@ -568,7 +568,7 @@ class Team(metaclass=IterTeam):
         if self.next_game_pk:
             daily_info = Team.daily_info()
             if self.name in daily_info["confirmed_lu"]:
-                lineup =  Team.lineups[self.name][self.opp_sp_hand]
+                lineup =  Team.lineups()[self.name][self.opp_sp_hand]
                 if len(lineup) == 9:
                     return lineup
             if self.name not in daily_info["confirmed_lu"]:
@@ -1204,45 +1204,45 @@ class Team(metaclass=IterTeam):
         for team in Team:
             if team.name == self.opp_name:
                 return team
-    @cached_property
-    def fd_weights(self):
-        if self.weather and self.projected_ump:
-            return {
-            'venue_p': .40,
-            'temp_p': .50,
-            'ump_p': .10,
-            'venue_h': .50,
-            'temp_h': .40,
-            'ump_h': .10
-            }
+    # @cached_property
+    # def fd_weights(self):
+    #     if self.weather and self.projected_ump:
+    #         return {
+    #         'venue_p': .40,
+    #         'temp_p': .50,
+    #         'ump_p': .10,
+    #         'venue_h': .50,
+    #         'temp_h': .40,
+    #         'ump_h': .10
+    #         }
             
-        elif self.weather:
-            return {
-            'venue_p': .50,
-            'temp_p': .50,
-            'ump_p': .0,
-            'venue_h': .50,
-            'temp_h': .50,
-            'ump_h': .0
-            }
-        elif self.projected_ump:
-            return {
-                'venue_p': .70,
-                'temp_p': .0,
-                'ump_p': .30,
-                'venue_h': .75,
-                'temp_h': .0,
-                'ump_h': .25
-                }
-        else:
-            return {
-                    'venue_p': 1,
-                    'temp_p': 0,
-                    'ump_p': 0,
-                    'venue_h': 1,
-                    'temp_h': 0,
-                    'ump_h': 0
-                    }
+    #     elif self.weather:
+    #         return {
+    #         'venue_p': .50,
+    #         'temp_p': .50,
+    #         'ump_p': .0,
+    #         'venue_h': .50,
+    #         'temp_h': .50,
+    #         'ump_h': .0
+    #         }
+    #     elif self.projected_ump:
+    #         return {
+    #             'venue_p': .70,
+    #             'temp_p': .0,
+    #             'ump_p': .30,
+    #             'venue_h': .75,
+    #             'temp_h': .0,
+    #             'ump_h': .25
+    #             }
+    #     else:
+    #         return {
+    #                 'venue_p': 1,
+    #                 'temp_p': 0,
+    #                 'ump_p': 0,
+    #                 'venue_h': 1,
+    #                 'temp_h': 0,
+    #                 'ump_h': 0
+    #                 }
     @cached_property
     def rested_sp(self):
         if self.last_game_pk:
@@ -1271,7 +1271,7 @@ class Team(metaclass=IterTeam):
         except AttributeError:
             pass
         try:
-            del self.lineupl
+            del self.lineup
         except AttributeError:
             pass
         
@@ -1324,3 +1324,9 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
+
+
+
+# red_sox.clear_team_cache(directories = [settings.DEPTH_DIR, settings.SCHED_DIR,settings.LINEUP_DIR, settings.GAME_DIR, settings.DEPTH_DIR, settings.ROSTER_DIR])
+# red_sox.lineup_df()
