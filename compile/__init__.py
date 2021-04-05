@@ -15,8 +15,4 @@ clean_directory(settings.DEPTH_DIR, force_delete=True)
 clean_directory(settings.GAME_DIR, force_delete=True)
 clean_directory(settings.GAME_DIR, force_delete=True)
 clean_directory(settings.SCHED_DIR, force_delete=True)
-
-
-
-
-
+clean_directory(settings.FD_DIR, force_delete=True)

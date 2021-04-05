@@ -209,16 +209,16 @@ if not data_path_p.exists():
 
     p_splits = pd.DataFrame(get_splits_p(range(settings.stat_range['player_start'], settings.stat_range['end']),sport=1,pool='ALL',get_all=True))
     
-    if not p_splits.get('games_sp_21'):
-        p_splits['games_sp_21'] = 0
-        p_splits['games_21'] = 0
-        p_splits['wins_21'] = 0
-        p_splits['losses_21'] = 0
-        p_splits['saves_21'] = 0
-        p_splits['save_chances_21'] = 0
-        p_splits['holds_21'] = 0
-        p_splits['complete_games_21'] = 0
-        p_splits['shutouts_21'] = 0
+    
+    values = {'games_sp_21': 0, 'games_21': 0, 'wins_21': 0, 'losses_21': 0, 'saves_21': 0, 
+              'save_chances_21': 0, 'holds_21': 0, 'complete_games_21': 0, 'shutouts_21': 0,
+              'games_sp_19': 0, 'games_19': 0, 'wins_19': 0, 'losses_19': 0, 'saves_19': 0, 
+              'save_chances_19': 0, 'holds_19': 0, 'complete_games_19': 0, 'shutouts_19': 0,
+              'games_sp_20': 0, 'games_20': 0, 'wins_20': 0, 'losses_20': 0, 'saves_20': 0, 
+              'save_chances_20': 0, 'holds_20': 0, 'complete_games_20': 0, 'shutouts_20': 0}
+    p_splits.fillna(value=values, inplace=True)
+    
+        
     
     p_splits['1b_vl'] = p_splits['hits_vl'] - (p_splits['hr_vl'] + p_splits['3b_vl'] + p_splits['2b_vl'])
     p_splits['1b_vr'] = p_splits['hits_vr'] - (p_splits['hr_vr'] + p_splits['3b_vr'] + p_splits['2b_vr'])

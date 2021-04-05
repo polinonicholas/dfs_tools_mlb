@@ -1140,7 +1140,7 @@ class Team(metaclass=IterTeam):
             wind_out = self.next_venue_data[self.next_venue_data['wind_direction'].isin(mac.weather.wind_out)]
             if len(wind_in.index) >= 50 and len(wind_out.index) >= 50:
                 if ((wind_out['fd_points'].mean() - wind_in['fd_points'].mean()) / game_data['fd_points'].mean()) > 0:
-                    if self.wind_speed >= game_data['wind_speed'].median():
+                    if self.wind_speed >= (game_data['wind_speed'].median() - 1):
                         if self.wind_direction in mac.weather.wind_out:
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
@@ -1293,7 +1293,12 @@ class Team(metaclass=IterTeam):
                 with open(file, "wb") as f:
                     pickle.dump(game, f)
                 print(f"Cached {self.name} next game.")
-        return None      
+        return None
+    
+    def clear_all_team_cache(self):
+        self.clear_team_cache(directories = [settings.BP_DIR, settings.SCHED_DIR,settings.LINEUP_DIR, settings.GAME_DIR])
+        return f"Cleared vital directories for {self.name}."
+
 athletics = Team(mlb_id = 133, name = 'athletics')
 pirates = Team(mlb_id = 134, name = 'pirates')
 padres = Team(mlb_id = 135, name = 'padres')
@@ -1325,8 +1330,3 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
-
-
-
-# red_sox.clear_team_cache(directories = [settings.DEPTH_DIR, settings.SCHED_DIR,settings.LINEUP_DIR, settings.GAME_DIR, settings.DEPTH_DIR, settings.ROSTER_DIR])
-# red_sox.lineup_df()
