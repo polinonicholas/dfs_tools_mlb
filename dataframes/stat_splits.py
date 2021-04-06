@@ -4,6 +4,7 @@ from dfs_tools_mlb.utils.storage import clean_directory
 import pandas as pd
 from dfs_tools_mlb.utils.time import time_frames as tf
 import pickle
+from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
 
 
 
@@ -204,6 +205,23 @@ else:
 h_q = h_splits[h_splits['pa'] >= h_splits['pa'].mean()]
 h_q_vr = h_splits[h_splits['pa_vr'] >= h_splits['pa_vr'].mean()]
 h_q_vl = h_splits[h_splits['pa_vl'] >= h_splits['pa_vl'].mean()]
+
+h_r_filt = (h_splits['bat_side'] == 'R')
+h_l_filt = (h_splits['bat_side'] == 'L')
+hq_r_filt = (h_splits['pa_vr'] >= h_splits['pa_vr'].mean())
+hq_l_filt = (h_splits['pa_vl'] >= h_splits['pa_vl'].mean())
+
+h_l_vl = h_splits[h_l_filt & hq_l_filt]
+h_r_vl = h_splits[h_r_filt & hq_l_filt]
+h_r_vr = h_splits[h_r_filt & hq_r_filt]
+h_l_vr = h_splits[h_l_filt & hq_r_filt]
+
+hp_filt = (h_splits['position_code'].isin(mac.players.p))
+hp = h_splits[hp_filt]
+hp_q_filt = (hp['pa'] >= hp['pa'].mean())
+hp_q = hp[hp_q_filt]
+
+
 
 if not data_path_p.exists():
 
@@ -515,5 +533,16 @@ p_q_rp = p_splits[p_splits['batters_faced_rp'] >= p_splits['batters_faced_rp'].m
 p_q_sp = p_splits[p_splits['batters_faced_sp'] >= p_splits['batters_faced_sp'].mean()]
 p_q_vl = p_splits[p_splits['batters_faced_vl'] >= p_splits['batters_faced_vl'].mean()]
 p_q_vr = p_splits[p_splits['batters_faced_vr'] >= p_splits['batters_faced_vr'].mean()]
-p_q = p_splits[p_splits['batters_faced'] >= p_splits['batters_faced'].mean()] 
+p_q = p_splits[p_splits['batters_faced'] >= p_splits['batters_faced'].mean()]
+
+l_filt = (p_splits['pitch_hand'] == 'L')
+r_filt = (p_splits['pitch_hand'] == 'R')
+l_q_filt = (p_splits['batters_faced_vl'] >= p_splits['batters_faced_vl'].mean())
+r_q_filt = (p_splits['batters_faced_vr'] >= p_splits['batters_faced_vr'].mean())
+
+p_q_l_vl = p_splits[l_filt & l_q_filt]
+p_q_r_vl = p_splits[r_filt & l_q_filt]
+p_q_l_vr = p_splits[l_filt & r_q_filt]
+p_q_r_vr = p_splits[r_filt & r_q_filt]
+
 

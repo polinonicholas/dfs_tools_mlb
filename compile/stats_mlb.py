@@ -6,7 +6,7 @@ import statsapi
 import pandas as pd
 import pickle
 import re
-from dfs_tools_mlb.utils.time import time_frames as tf
+
 """
 seasons: list of years (e.g. [2020])
 player_group: 'hitting' or 'pitching'
@@ -131,7 +131,8 @@ def get_statcast_p(player_id, season):
 def get_splits_h(seasons,sport=1,pool='ALL',get_all=True):
     splits=['vr','vl']
     cs = current_season()['season_id']
-    fields='stats,splits,totalSplits,season,stat,team,id,player,stat,groundOuts,airOuts,runs,doubles,triples,homeRuns,strikeOuts,baseOnBalls,intentionalWalks,hits,hitByPitch,avg,atBats,obp,slg,ops,caughtStealing,stolenBases,stolenBasePercentage,groundIntoDoublePlay,numberOfPitches,plateAppearances,totalBases,rbi,sacBunts,sacFlies,babip,groundOutsToAirouts,atBatsPerHomeRun,fullName'
+    fields='stats,splits,totalSplits,season,stat,team,id,player,stat,groundOuts,airOuts,runs,doubles,triples,homeRuns,strikeOuts,baseOnBalls,intentionalWalks,hits,hitByPitch,avg,atBats,obp,slg,ops,caughtStealing,stolenBases,stolenBasePercentage,groundIntoDoublePlay,numberOfPitches,plateAppearances,totalBases,rbi,sacBunts,sacFlies,babip,groundOutsToAirouts,atBatsPerHomeRun,fullName,code,batSide,primaryPosition'
+    hydrate = 'person'
     if len(seasons) > 1:
         final_path = settings.ARCHIVE_DIR.joinpath(pickle_path(name='h_data_' + str(seasons[0]) + '-' + str(seasons[-1])))
         if str(seasons[-1]) == cs and len(seasons) > 2:
@@ -161,6 +162,8 @@ def get_splits_h(seasons,sport=1,pool='ALL',get_all=True):
     def compile_stats(data, split, player):
             player['mlb_id'] = data['player']['id']
             player['name'] = data['player']['fullName']
+            player['bat_side'] = data['player']['batSide']['code']
+            player['position_code'] = data['player']['primaryPosition']['code']
             stats = data['stat']
             player['gb' + '_' + split] = stats['groundOuts']
             player['fb' + '_' + split] = stats['airOuts']
@@ -217,7 +220,7 @@ def get_splits_h(seasons,sport=1,pool='ALL',get_all=True):
         if season == cs and store_static and players:
             static_players = players
         for split in splits:
-            call = statsapi.get('stats', {'stats':'statSplits','playerPool':pool, 'limit': 10000, 'sitCodes': split, 'season': season, 'group':'hitting', 'sportIds':sport, 'fields':fields}, force=True)
+            call = statsapi.get('stats', {'stats':'statSplits','playerPool':pool, 'limit': 10000, 'sitCodes': split, 'season': season, 'group':'hitting', 'sportIds':sport, 'fields':fields, 'hydrate':hydrate}, force=True)
             data = call['stats'][0]['splits']
             total_splits = call['stats'][0]['totalSplits']
             total_returned = len(data)
@@ -237,7 +240,7 @@ def get_splits_h(seasons,sport=1,pool='ALL',get_all=True):
                 flag = 0
                 while total_splits != total_returned:
                     offset = total_returned
-                    call = statsapi.get('stats', {'stats':'statSplits','playerPool':pool, 'limit': 10000, 'sitCodes': split, 'season': season, 'group':'hitting', 'sportIds':sport, 'fields':fields,'offset':offset}, force=True)
+                    call = statsapi.get('stats', {'stats':'statSplits','playerPool':pool, 'limit': 10000, 'sitCodes': split, 'season': season, 'group':'hitting', 'sportIds':sport, 'fields':fields,'offset':offset, 'hydrate': hydrate}, force=True)
                     data = call['stats'][0]['splits']
                     total_offset = len(data)
                     flag += 1
@@ -271,7 +274,7 @@ def get_splits_h(seasons,sport=1,pool='ALL',get_all=True):
 def get_splits_p(seasons,sport=1,pool='ALL',get_all=True):
     splits=['vr','vl','sp','rp']
     cs = current_season()['season_id']
-    fields='stats,totalSplits,splits,stat,id,player,groundOuts,airOuts,runs,doubles,triples,homeRuns,strikeOuts,baseOnBalls,intentionalWalks,hits,hitByPitch,avg,atBats,obp,slg,ops,caughtStealing,stolenBases,stolenBasePercentage,groundIntoDoublePlay,numberOfPitches,era,inningsPitched,earnedRuns,whip,battersFaced,outs,balls,strikes,strikePercentage,hitBatsmen,balks,wildPitches,pickoffs,totalBases,groundOutsToAirouts,rbi,pitchesPerInning,strikeoutWalkRatio,strikeoutsPer9Inn,walksPer9Inn,hitsPer9Inn,runsScoredPer9,homeRunsPer9,inheritedRunners,inheritedRunnersScored,inheritedRunnersStrandedPercentage,sacBunts,sacFlies,gamesStarted,gamesPitched,wins,losses,saves,saveOpportunities,holds,completeGames,shutouts,fullName'
+    fields='stats,totalSplits,splits,stat,id,player,groundOuts,airOuts,runs,doubles,triples,homeRuns,strikeOuts,baseOnBalls,intentionalWalks,hits,hitByPitch,avg,atBats,obp,slg,ops,caughtStealing,stolenBases,stolenBasePercentage,groundIntoDoublePlay,numberOfPitches,era,inningsPitched,earnedRuns,whip,battersFaced,outs,balls,strikes,strikePercentage,hitBatsmen,balks,wildPitches,pickoffs,totalBases,groundOutsToAirouts,rbi,pitchesPerInning,strikeoutWalkRatio,strikeoutsPer9Inn,walksPer9Inn,hitsPer9Inn,runsScoredPer9,homeRunsPer9,inheritedRunners,inheritedRunnersScored,inheritedRunnersStrandedPercentage,sacBunts,sacFlies,gamesStarted,gamesPitched,wins,losses,saves,saveOpportunities,holds,completeGames,shutouts,fullName,pitchHand,code'
     if len(seasons) > 1:
         final_path = settings.ARCHIVE_DIR.joinpath(pickle_path(name='p_data_' + str(seasons[0]) + '-' + str(seasons[-1])))
         if str(seasons[-1]) == cs and len(seasons) > 2:
@@ -317,6 +320,7 @@ def get_splits_p(seasons,sport=1,pool='ALL',get_all=True):
             stats = d['stat']
             player['mlb_id'] = d['player']['id']
             player['name'] = d['player']['fullName']
+            player['pitch_hand']  = d['player']['pitchHand']['code']
             player['gb' + '_' + split] = stats['groundOuts']
             player['fb' + '_' + split] = stats['airOuts']
             player['runs' + '_' + split] = stats['runs']
@@ -399,7 +403,8 @@ def get_splits_p(seasons,sport=1,pool='ALL',get_all=True):
                 hydrate = f"person(stats(group=[pitching],type=[season],season={season}))"
                 call = statsapi.get('stats', {'hydrate': hydrate, 'stats':'statSplits','playerPool':pool, 'limit': 1000, 'sitCodes': split, 'season': season, 'group':'pitching', 'sportIds':sport, 'fields':fields}, force=True)
             else:
-                call = statsapi.get('stats', {'stats':'statSplits','playerPool':pool, 'limit': 1000, 'sitCodes': split, 'season': season, 'group':'pitching', 'sportIds':sport, 'fields':fields}, force=True)
+                hydrate = 'person'
+                call = statsapi.get('stats', {'stats':'statSplits','playerPool':pool, 'limit': 1000, 'sitCodes': split, 'season': season, 'group':'pitching', 'sportIds':sport, 'fields':fields, 'hydrate': hydrate}, force=True)
             data = call['stats'][0]['splits']
             total_splits = call['stats'][0]['totalSplits']
             total_returned = len(data)

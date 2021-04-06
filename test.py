@@ -1,32 +1,35 @@
 from dfs_tools_mlb.compile.fanduel import FDSlate
 
 s=FDSlate(
-          slate_number = 1,
+          slate_number = 2,
           lineups = 150,
-          p_fades = [],
-          h_fades=[],
-          stack_points_weight = 2,
+          p_fades = ['red sox','dodgers', 'giants', 'cubs', 'brewers',
+                     'padres', 'mariners', 'angels', 'astros', 'phillies',
+                     'athletics', 'rays'],
+          h_fades = ['phillies', 'mariners'],
+          no_stack = ['mariners', 'phillies','astros'],
+          stack_points_weight = 1.4,
           stack_threshold = 50,
-          pitcher_threshold = 50)
-
-x = s.build_lineups(index_track = 0,
-                    lus = 150,
-                    max_order = 7,
-                    max_surplus = 1100,
-                    max_lu_total = 75,
-                    variance = 20,
-                    max_lu_stack = 50,
-                    max_sal = 35000,
-                    stack_sample = 6,
-                    util_replace_filt = 0,
-                    non_stack_quantile = .9)
-
+          pitcher_threshold = 130)
 
 
 # s.get_pitchers()
 # s.get_hitters()
-s.finalize_entries()
 
+x = s.build_lineups(index_track = 0,
+                    lus = 150,
+                    max_order = 7,
+                    max_surplus = 400,
+                    max_lu_total = 75,
+                    variance = 15,
+                    max_lu_stack = 50,
+                    max_sal = 35000,
+                    stack_sample = 6,
+                    util_replace_filt = 0,
+                    non_stack_quantile = .9,
+                    high_salary_quantile = .95,
+                    enforce_hitter_surplus = True,
+                    enforce_pitcher_surplus = True)
 #hitter counts
 hc_df = s.h_counts()
 hc_index = hc_df['t_count'].nlargest(60).index
@@ -48,3 +51,7 @@ initial_pitcher = s.p_lu_df()['lus'].to_dict()
 # team: stacks to build
 initial_stacks = s.stacks_df()['stacks'].to_dict()
 
+
+# s.finalize_entries()
+
+# hitter_counts['fd_salary'].quantile(.90)
