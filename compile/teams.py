@@ -1042,7 +1042,10 @@ class Team(metaclass=IterTeam):
     @cached_property
     def next_venue(self):
         if self.next_game_pk:
-            return self.next_game['gameData']['venue']['id']
+            v_id =  self.next_game['gameData']['venue']['id']
+            if v_id == 5325 and not self.roof_closed:
+                return 13
+            return v_id
         return self.next_game_pk
     
     @cached_property
@@ -1148,6 +1151,8 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def next_has_roof(self):
+        if self.next_venue == 13:
+            return True
         return any(i in mac.weather.roof_closed for i in self.next_venue_data['condition'].unique())
     
     @cached_property
@@ -1254,45 +1259,7 @@ class Team(metaclass=IterTeam):
         for team in Team:
             if team.name == self.opp_name:
                 return team
-    # @cached_property
-    # def fd_weights(self):
-    #     if self.weather and self.projected_ump:
-    #         return {
-    #         'venue_p': .40,
-    #         'temp_p': .50,
-    #         'ump_p': .10,
-    #         'venue_h': .50,
-    #         'temp_h': .40,
-    #         'ump_h': .10
-    #         }
-            
-    #     elif self.weather:
-    #         return {
-    #         'venue_p': .50,
-    #         'temp_p': .50,
-    #         'ump_p': .0,
-    #         'venue_h': .50,
-    #         'temp_h': .50,
-    #         'ump_h': .0
-    #         }
-    #     elif self.projected_ump:
-    #         return {
-    #             'venue_p': .70,
-    #             'temp_p': .0,
-    #             'ump_p': .30,
-    #             'venue_h': .75,
-    #             'temp_h': .0,
-    #             'ump_h': .25
-    #             }
-    #     else:
-    #         return {
-    #                 'venue_p': 1,
-    #                 'temp_p': 0,
-    #                 'ump_p': 0,
-    #                 'venue_h': 1,
-    #                 'temp_h': 0,
-    #                 'ump_h': 0
-    #                 }
+    
     @cached_property
     def rested_sp(self):
         if self.last_game_pk:
@@ -1379,6 +1346,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
-
 
