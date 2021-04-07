@@ -1043,7 +1043,7 @@ class Team(metaclass=IterTeam):
     def next_venue(self):
         if self.next_game_pk:
             v_id =  self.next_game['gameData']['venue']['id']
-            if v_id == 5325 and not self.roof_closed:
+            if v_id == 5325:
                 return 13
             return v_id
         return self.next_game_pk
@@ -1346,4 +1346,3 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
