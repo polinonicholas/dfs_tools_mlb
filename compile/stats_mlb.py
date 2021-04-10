@@ -474,4 +474,3 @@ def get_p_diff(player_id, season1, season2, filt1='', filt2=''):
     spin_diff = df1['releaseSpinRate'].max() - df2['releaseSpinRate'].max()
     launch_diff = df1['launchAngle'].max() - df2['launchAngle'].max()
     return {'speed': speed_diff, 'spin': spin_diff, 'launch': launch_diff}
-

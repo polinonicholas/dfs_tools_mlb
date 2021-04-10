@@ -6,8 +6,6 @@ from dfs_tools_mlb.utils.time import time_frames as tf
 import pickle
 from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
 
-
-
 data_path_h = settings.STORAGE_DIR.joinpath(f'player_data_h_{tf.today}.pickle')
 data_path_p = settings.STORAGE_DIR.joinpath(f'player_data_p_{tf.today}.pickle')
 if not data_path_h.exists() or not data_path_p.exists():

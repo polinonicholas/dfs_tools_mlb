@@ -807,6 +807,8 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vl'] < 100) | (p_df['fd_wpa_b_vl'].isna()), 'fd_wpa_b_vl'] = p_q_r_vl['fd_wpa_b_vl'].median()
             
             key = 'fd_wps_pa_' + self.o_split
+            h_df.loc[lefties, 'exp_ps_sp_pa'] = ((p_df['fd_wpa_b_vl'].max() + h_df[key]) / 2)
+            h_df.loc[righties, 'exp_ps_sp_pa'] = ((p_df['fd_wpa_b_vr'].max() + h_df[key]) / 2)
             h_df.loc[lefties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vl'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
             h_df.loc[righties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vr'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
             h_df.loc[lefties, 'sp_mu'] = p_df['fd_wpa_b_vl'].max()
@@ -1043,8 +1045,6 @@ class Team(metaclass=IterTeam):
     def next_venue(self):
         if self.next_game_pk:
             v_id =  self.next_game['gameData']['venue']['id']
-            if v_id == 5325:
-                return 13
             return v_id
         return self.next_game_pk
     
@@ -1151,8 +1151,6 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def next_has_roof(self):
-        if self.next_venue == 13:
-            return True
         return any(i in mac.weather.roof_closed for i in self.next_venue_data['condition'].unique())
     
     @cached_property
@@ -1346,3 +1344,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
