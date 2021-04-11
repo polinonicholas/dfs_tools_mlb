@@ -328,7 +328,11 @@ class FDSlate:
                       custom_pitchers = None,
                       x_fallback = [],
                       stack_only = [],
-                      below_avg_count = 20):
+                      below_avg_count = 20,
+                      stack_expand_limit = 15,
+                      of_count_adjust = 15,
+                      limit_risk = [],
+                      risk_limit = 30):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
@@ -342,6 +346,8 @@ class FDSlate:
         #count non_stack
         h['ns_count'] = 0
         h_count_df = h.copy()
+        h.loc[(h['fd_position'].apply(lambda x: 'of' in x)), 't_count'] -= of_count_adjust
+        h.loc[(h['team'].isin(limit_risk)), 't_count'] = risk_limit
         h.loc[(h['fd_wps_pa'] < h['fd_wps_pa'].median()),'t_count'] = below_avg_count
         h.loc[(h['team'].isin(stack_only)), 't_count'] = 1000
         
@@ -406,10 +412,14 @@ class FDSlate:
                 print(p_info)
                 break
                 continue
+            remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
             stack_df = h[h['team'] == stack]
-            #filter the selected stack by stack_sample arg. 
-            highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(stack_sample).index]
+            #filter the selected stack by stack_sample arg.
+            if remaining_stacks > stack_expand_limit:
+                highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(stack_sample+1).index]
+            else:
+                highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(stack_sample).index]
             #array of fanduel ids of the selected hitters
             stack_ids = highest['fd_id'].values
             #initial empty lineup, ordered by fanduel structed and mapped by p_map
@@ -510,7 +520,7 @@ class FDSlate:
             count_filt = (h['t_count'] < ((max_lu_total - max_stack) - variance))
             
             plat_filt = (h['is_platoon'] != True)
-            value_filt = ((h['fd_salary'] < h['fd_salary'].median()) & (h['points'] > h['points'].median()))
+            value_filt = ((h['fd_salary'] <= h['fd_salary'].median()) & (h['points'] >= h['points'].median()))
             
             for ps in needed_pos:
                 #filter out players already in lineup, lineup will change with each iteration
