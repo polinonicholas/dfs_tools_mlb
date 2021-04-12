@@ -27,8 +27,8 @@ class FDSlate:
         self.lineups = lineups
         self.p_fades = p_fades
         self.h_fades = h_fades
-        daily_info = teams.Team.daily_info()
-        self.p_fades.extend(daily_info['rain'])
+        # daily_info = teams.Team.daily_info()
+        # self.p_fades.extend(daily_info['rain'])
         self.points_weight = stack_points_weight
         self.stack_threshold = stack_threshold
         self.pitcher_threshold = pitcher_threshold
@@ -84,6 +84,13 @@ class FDSlate:
     @cached_property
     def active_teams(self):
         return self.player_info_df['team'].unique()
+    @cached_property
+    def default_stack_dict(self):
+        team_dict = {}
+        for team in self.active_teams:
+            team_dict[team] = 0
+        return team_dict
+    
     def insert_lineup(self, idx, lineup):
         cols = ['P', 'C/1B', '2B', '3B', 'SS', 'OF', 'OF.1', 'OF.2', 'UTIL']
         df = self.entries_df()
@@ -117,14 +124,14 @@ class FDSlate:
             order_filter = (hitters['order'] <= self.max_batting_order)
             hitters_order = hitters[order_filter]
             team.salary = hitters_order['fd_salary'].sum() / len(hitters_order.index)
-            cols = ["raw_points", "venue_points", "temp_points", "points", "salary"]
+            cols = ["raw_points", "venue_points", "temp_points", "points", "salary", "sp_mu"]
             points_file = pickle_path(name=f"team_points_{tf.today}_{self.slate_number}", directory=settings.FD_DIR)
             points_path = settings.FD_DIR.joinpath(points_file)
             if points_path.exists():
                 p_df = pd.read_pickle(points_path)
             else:
                 p_df = pd.DataFrame(columns = cols)
-            p_df.loc[team.name, cols] = [team.raw_points, team.venue_points, team.temp_points, team.points, team.salary]
+            p_df.loc[team.name, cols] = [team.raw_points, team.venue_points, team.temp_points, team.points, team.salary, team.sp_mu]
             with open(points_file, 'wb') as f:
                 pickle.dump(p_df, f)
             if path.exists():
@@ -216,7 +223,6 @@ class FDSlate:
             df_c = df.copy()
             df_c['z'] = ((df_c['p_z'] + df_c['s_z']) / 2) + increment
             df_c = df_c[df_c['z'] > 0]
-            
             lu_base = lineups / len(df_c.index)
             df_c['stacks'] = lu_base * df_c['z']
             if df_c['stacks'].max() > self.stack_threshold:
@@ -328,11 +334,11 @@ class FDSlate:
                       custom_pitchers = None,
                       x_fallback = [],
                       stack_only = [],
-                      below_avg_count = 20,
+                      below_avg_count = 25,
                       stack_expand_limit = 15,
-                      of_count_adjust = 15,
+                      of_count_adjust = 12,
                       limit_risk = [],
-                      risk_limit = 30):
+                      risk_limit = 25):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
@@ -410,7 +416,6 @@ class FDSlate:
                 print('continuing')
                 print(stack)
                 print(p_info)
-                break
                 continue
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack

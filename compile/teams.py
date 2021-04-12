@@ -597,6 +597,7 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def projected_lineup(self):
+        print(f"Getting projected lineup for {self.name}")
         team_lineups = Team.lineups()
         try:
             if len(team_lineups[self.name][self.opp_sp_hand]) == 9:
@@ -727,8 +728,6 @@ class Team(metaclass=IterTeam):
                 
             lefties = (h_df['bat_side'] == 'L')
             righties = (h_df['bat_side'] == 'R')
-            
-    
             # adjustments for pitchers in lineup
             h_df.loc[((h_df['pa'] < 100) | (h_df['pitches_pa'].isna())) & (h_df['position'].isin(mac.players.p)), 'pitches_pa'] = hp_q['pitches_pa'].median()
             h_df.loc[((h_df['pa_vr'] < 100) | (h_df['pitches_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'pitches_pa_vr'] = hp_q['pitches_pa'].median()
@@ -742,9 +741,7 @@ class Team(metaclass=IterTeam):
             h_df.loc[((h_df['pa_vr'] < 100) | (h_df['fd_wpa_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'fd_wpa_pa_vr'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[((h_df['pa_vl'] < 100) | (h_df['fd_wpa_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'fd_wpa_pa_vl'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[(h_df['pa'] < 100) | (h_df['fd_wpa_pa'].isna()), 'fd_wpa_pa'] = hp_q['fd_wpa_pa'].median()
-            
-            
-            
+
             h_df.loc[((h_df['pa_vr'] < 100) | (h_df['pitches_pa_vr'].isna())) & righties, 'pitches_pa_vr'] = h_r_vr['pitches_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 100) | (h_df['pitches_pa_vl'].isna())) & lefties, 'pitches_pa_vl'] = h_l_vl['pitches_pa_vl'].median()
             h_df.loc[((h_df['pa_vr'] < 100) | (h_df['fd_wps_pa_vr'].isna())) & righties, 'fd_wps_pa_vr'] = h_r_vr['fd_wps_pa_vr'].median()
@@ -813,6 +810,7 @@ class Team(metaclass=IterTeam):
             h_df.loc[righties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vr'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
             h_df.loc[lefties, 'sp_mu'] = p_df['fd_wpa_b_vl'].max()
             h_df.loc[righties, 'sp_mu'] = p_df['fd_wpa_b_vr'].max()
+            self.sp_mu = h_df['sp_mu'].sum()
             #points conceded
             key = 'fd_wpa_pa_' + self.o_split
             
@@ -867,6 +865,7 @@ class Team(metaclass=IterTeam):
                 exp_bf_bp -= 1
             h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * ((bp['fd_wpa_b_rp'].mean() + h_df['fd_wps_pa']) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
+            
             self.raw_points = h_df['exp_ps_raw'].sum()
             self.venue_points = (self.raw_points * self.next_venue_boost) - self.raw_points
             self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
@@ -892,6 +891,7 @@ class Team(metaclass=IterTeam):
             self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
             self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
             self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
+            self.sp_mu = h_df['sp_mu'].sum()
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
         
         return h_df
@@ -1123,7 +1123,7 @@ class Team(metaclass=IterTeam):
             condition = self.weather.get('condition')
             if condition in mac.weather.rain:
                 file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                daily_info = Team.daily_info
+                daily_info = Team.daily_info()
                 if self.name not in daily_info["rain"]:
                     daily_info["rain"].append(self.name)
                     with open(file, "w+") as f:
