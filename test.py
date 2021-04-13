@@ -21,16 +21,18 @@ x = s.build_lineups(
                     custom_pitchers = None,
                     x_fallback = [],
                     stack_only = [],
+                    limit_risk=[],
+                    enforce_pitcher_surplus=False
                     )
-# s.finalize_entries()     
+s.finalize_entries()     
 
 #dict p_df.index: p_df: lineups to be in
 default_pitcher = s.p_df()['points'].to_dict()
 # # team: stacks to build
-default_stacks = s.default_stacks_dict
+default_stacks = s.default_stack_dict
 
 all_stacks = s.points_df()[['points', 'salary']].sort_values(by='points')
-all_pitchers = s.p_df()[['name', 'points', 'fd_salary', 'pitches_start']].sort_values(by='points')
+all_pitchers = s.p_df()[['name', 'points', 'fd_salary', 'pitches_start', 'team', 'opp']].sort_values(by='points')
 
 #AFTER BUILDING LINEUPS
 pc_df = s.p_counts()
