@@ -1198,8 +1198,8 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        # if len(self.next_venue_data.index) < 100:
-        #     return 1
+        if len(self.next_venue_data.index) < 100:
+            return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
     @cached_property
     def temp_boost(self):
