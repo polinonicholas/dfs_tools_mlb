@@ -325,7 +325,7 @@ class FDSlate:
     def build_lineups(self, lus = 150, index_track = 0, max_surplus = 600, max_lu_total = 75,
                       max_lu_stack = 50, max_sal = 35000, stack_sample = 5, util_replace_filt = 0,
                       variance = 25, non_stack_quantile = .80, high_salary_quantile = .80,
-                      enforce_pitcher_surplus = False,
+                      enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = True, 
                       non_stack_max_order=6, 
                       custom_counts={},
