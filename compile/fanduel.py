@@ -12,12 +12,19 @@ from dfs_tools_mlb.utils.pd import sm_merge_single
 import random
 
 class FDSlate:
-    def __init__(self, entries_file=config.get_fd_file(), slate_number = 1, lineups = 150,
+    def __init__(self, 
+                 entries_file=config.get_fd_file(), 
+                 slate_number = 1, 
+                 lineups = 150,
                  p_fades = [],
                  h_fades=[],
                  no_stack=[],
-                 stack_points_weight = 2, stack_threshold = 50, pitcher_threshold = 75,
-                 heavy_weight_stack=False, heavy_weight_p=False, max_batting_order=7):
+                 stack_points_weight = 2, 
+                 stack_threshold = 50, 
+                 pitcher_threshold = 75,
+                 heavy_weight_stack=False, 
+                 heavy_weight_p=False, 
+                 max_batting_order=7):
         
         self.entry_csv = entries_file
         if not self.entry_csv:
@@ -322,9 +329,17 @@ class FDSlate:
             return "No lineups stored yet."
         
     
-    def build_lineups(self, lus = 150, index_track = 0, max_surplus = 600, max_lu_total = 75,
-                      max_lu_stack = 50, max_sal = 35000, stack_sample = 5, util_replace_filt = 0,
-                      variance = 25, non_stack_quantile = .80, high_salary_quantile = .80,
+    def build_lineups(self, lus = 150, 
+                      index_track = 0, 
+                      max_surplus = 600, 
+                      max_lu_total = 75,
+                      max_lu_stack = 50, 
+                      max_sal = 35000, 
+                      stack_sample = 5, 
+                      util_replace_filt = 0,
+                      variance = 25, 
+                      non_stack_quantile = .80, 
+                      high_salary_quantile = .80,
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = True, 
                       non_stack_max_order=6, 
@@ -336,26 +351,31 @@ class FDSlate:
                       stack_only = [],
                       below_avg_count = 25,
                       stack_expand_limit = 15,
-                      of_count_adjust = 12,
+                      of_count_adjust = 6,
                       limit_risk = [],
-                      risk_limit = 25):
+                      risk_limit = 25,
+                      exempt=[]):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
         #dropping faded, platoon, and low order (max_order) players.
         h_fade_filt = ((h['team'].isin(self.h_fades)) | (h['fd_id'].isin(self.h_fades)))
         h_order_filt = (h['order'] > max_order)
-        hfi = h[h_fade_filt | h_order_filt].index
+        h_exempt_filt = (~h['fd_id'].isin(exempt))
+        hfi = h[(h_fade_filt | h_order_filt) & h_exempt_filt].index
         h.drop(index=hfi,inplace=True)
         #count each players entries
         h['t_count'] = 0
         #count non_stack
         h['ns_count'] = 0
         h_count_df = h.copy()
-        h.loc[(h['fd_position'].apply(lambda x: 'of' in x)), 't_count'] -= of_count_adjust
-        h.loc[(h['team'].isin(limit_risk)), 't_count'] = risk_limit
+        #risk_limit should always be >= below_avg_count
         h.loc[(h['fd_wps_pa'] < h['fd_wps_pa'].median()),'t_count'] = below_avg_count
         h.loc[(h['team'].isin(stack_only)), 't_count'] = 1000
+        exempt_filt = (h['fd_id'].isin(exempt))
+        h.loc[exempt_filt, 't_count'] = 0
+        h.loc[(h['fd_position'].apply(lambda x: 'of' in x)), 't_count'] -= of_count_adjust
+        h.loc[(h['team'].isin(limit_risk)), 't_count'] = risk_limit
         
         for k,v in custom_counts.items():
             h.loc[h['fd_id'] == k, 't_count'] = v
@@ -699,7 +719,7 @@ class FDSlate:
             #if there aren't enough teams being used, replace the utility player with a team not in use.    
             h_df = h[h['fd_id'].isin(lineup)]
             used_teams=h_df['team'].unique()
-            if not reset and len(used_teams) < 3:
+            if not reset and (len(used_teams) < 3 and p_info[3] in used_teams):
                 try:
                     #filter out players on teams already in lineup
                     dupe_filt = ((~h['fd_id'].isin(lineup)) & (~h['team'].isin(used_teams)))
@@ -734,8 +754,7 @@ class FDSlate:
             used_players = []
             h_df = h[h['fd_id'].isin(lineup)]
             used_teams = h_df['team'].unique()
-            while not reset and (sorted(lineup) in sorted_lus or len(used_teams) < 3):
-                
+            while not reset and (sorted(lineup) in sorted_lus or (len(used_teams) < 3 and p_info[3] in used_teams)):
                 try:
                     #redeclare use_teams each pass
                     h_df = h[h['fd_id'].isin(lineup)]
