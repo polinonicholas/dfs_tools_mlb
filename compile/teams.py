@@ -27,7 +27,7 @@ from dfs_tools_mlb.dataframes.stat_splits import (h_splits, p_splits, h_q, h_q_v
                                                   p_q_r_vr, h_l_vl,h_l_vr,h_r_vr,h_r_vl,hp_q)
 
 
-
+p_q_rp['ra-_b_rp'].mean()
 
 
 
@@ -804,10 +804,10 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['fd_wpa_b_vl'].isna()), 'fd_wpa_b_vl'] = p_q_r_vl['fd_wpa_b_vl'].median()
             
             key = 'fd_wps_pa_' + self.o_split
-            h_df.loc[lefties, 'exp_ps_sp_pa'] = ((p_df['fd_wpa_b_vl'].max() + h_df[key]) / 2)
-            h_df.loc[righties, 'exp_ps_sp_pa'] = ((p_df['fd_wpa_b_vr'].max() + h_df[key]) / 2)
-            h_df.loc[lefties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vl'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
-            h_df.loc[righties, 'exp_ps_sp'] = ((p_df['fd_wpa_b_vr'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
+            h_df.loc[lefties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vl'].max() * 1.1) + (h_df[key] *.9)) / 2)
+            h_df.loc[righties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vr'].max()  * 1.1) + (h_df[key] *.9)) / 2)
+            h_df.loc[lefties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vl'].max()  * 1.1) + (h_df[key] *.9)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[righties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vr'].max()  * 1.1) + (h_df[key] *.9)) / 2) * h_df['exp_pa_sp']
             h_df.loc[lefties, 'sp_mu'] = p_df['fd_wpa_b_vl'].max()
             h_df.loc[righties, 'sp_mu'] = p_df['fd_wpa_b_vr'].max()
             self.sp_mu = h_df['sp_mu'].sum()
@@ -821,8 +821,8 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['fd_wps_b_vr'].isna()), 'fd_wps_b_vr'] = p_q_r_vr['fd_wps_b_vr'].median()
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['fd_wps_b_vl'].isna()), 'fd_wps_b_vl'] = p_q_r_vl['fd_wps_b_vl'].median()
                 
-            h_df.loc[lefties, 'exp_pc_sp'] = ((p_df['fd_wps_b_vl'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
-            h_df.loc[righties, 'exp_pc_sp'] = ((p_df['fd_wps_b_vr'].max() + h_df[key]) / 2) * h_df['exp_pa_sp']
+            h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1.1) + (h_df[key] * .9)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1.1) + (h_df[key] * .9)) / 2) * h_df['exp_pa_sp']
             h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
             if p_df['pitch_hand'].item() == 'L':
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['ra-_b_vr'].isna()), 'ra-_b_vr'] = p_q_l_vr['ra-_b_vr'].median()
@@ -830,8 +830,6 @@ class Team(metaclass=IterTeam):
             else:
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['ra-_b_vr'].isna()), 'ra-_b_vr'] = p_q_r_vr['ra-_b_vr'].median()
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['ra-_b_vl'].isna()), 'ra-_b_vl'] = p_q_r_vl['ra-_b_vl'].median()
-                
-            
             exp_pa_r_sp = h_df.loc[righties, 'exp_pa_sp'].sum()
             exp_pa_l_sp = h_df.loc[lefties, 'exp_pa_sp'].sum()
             p_df['exp_ra'] = floor((exp_pa_r_sp * p_df['ra-_b_vr'].max()) + (exp_pa_l_sp * p_df['ra-_b_vl'].max()))
@@ -853,7 +851,12 @@ class Team(metaclass=IterTeam):
             bp.loc[((bp['batters_faced_vl'] < 25) | (bp['ra-_b_vl'].isna())) & r_filt, 'ra-_b_vl'] = p_q_r_vl['ra-_b_vl'].median()
             bp.loc[(bp['batters_faced_rp'] < 25) | (bp['fd_wpa_b_rp'].isna()), 'fd_wpa_b_rp'] = p_q_rp['fd_wpa_b_rp'].median()
             bp.loc[(bp['batters_faced_rp'] < 25) | (bp['ra-_b_rp'].isna()), 'ra-_b_rp'] = p_q_rp['ra-_b_rp'].median()
-            exp_bf_bp = round((exp_bp_inn * 3) + ((exp_bp_inn * 3) * bp['ra-_b_rp'].mean()))
+            try:
+                exp_bf_bp = round((exp_bp_inn * 3) + ((exp_bp_inn * 3) * bp['ra-_b_rp'].mean()))
+            except ValueError:
+                print(f'USING DEFAULT BP RA- for {self.name}')
+                exp_bf_bp = round((exp_bp_inn * 3) + ((exp_bp_inn * 3) * p_q_rp['ra-_b_rp'].median()))
+                
             first_bp_pa = h_df.loc[(h_df['exp_pa_sp'] == floor(p_df['exp_x_lu'])), 'order'].idxmin()
             order = h_df.loc[first_bp_pa, 'order'].item()
             h_df['exp_pa_bp'] = 0
@@ -863,7 +866,7 @@ class Team(metaclass=IterTeam):
                 h_df.loc[h_df['order'] == order, 'exp_pa_bp'] += 1
                 order += 1
                 exp_bf_bp -= 1
-            h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * ((bp['fd_wpa_b_rp'].mean() + h_df['fd_wps_pa']) / 2)
+            h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1.1) + (h_df['fd_wps_pa'] * .9)) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
             
             self.raw_points = h_df['exp_ps_raw'].sum()
@@ -893,9 +896,7 @@ class Team(metaclass=IterTeam):
             self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
             self.sp_mu = h_df['sp_mu'].sum()
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
-        
         return h_df
-    
     def sp_df(self):
         daily_info = Team.daily_info()
         projected_sp = self.projected_sp()
@@ -1344,5 +1345,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
 

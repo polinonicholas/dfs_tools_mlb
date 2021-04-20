@@ -342,7 +342,7 @@ class FDSlate:
                       high_salary_quantile = .80,
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = True, 
-                      non_stack_max_order=6, 
+                      non_stack_max_order=5, 
                       custom_counts={},
                       fallback_stack_sample = 6,
                       custom_stacks = None,
@@ -370,7 +370,7 @@ class FDSlate:
         h['ns_count'] = 0
         h_count_df = h.copy()
         #risk_limit should always be >= below_avg_count
-        h.loc[(h['fd_wps_pa'] < h['fd_wps_pa'].median()),'t_count'] = below_avg_count
+        h.loc[(h['exp_ps_sp_pa'] < h['exp_ps_sp_pa'].median()),'t_count'] = below_avg_count
         h.loc[(h['team'].isin(stack_only)), 't_count'] = 1000
         exempt_filt = (h['fd_id'].isin(exempt))
         h.loc[exempt_filt, 't_count'] = 0
@@ -440,11 +440,19 @@ class FDSlate:
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
             stack_df = h[h['team'] == stack]
+            if remaining_stacks % 4 == 0:
+                stack_key = 'total_pitches'
+            elif remaining_stacks % 3 == 0:
+                stack_key = 'fd_hr_weight'
+            elif remaining_stacks % 2 == 0:
+                stack_key = 'points'
+            else:
+                stack_key = 'exp_ps_sp_pa'
             #filter the selected stack by stack_sample arg.
             if remaining_stacks > stack_expand_limit:
-                highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(stack_sample+1).index]
+                highest = stack_df.loc[stack_df[stack_key].nlargest(stack_sample+1).index]
             else:
-                highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(stack_sample).index]
+                highest = stack_df.loc[stack_df[stack_key].nlargest(stack_sample).index]
             #array of fanduel ids of the selected hitters
             stack_ids = highest['fd_id'].values
             #initial empty lineup, ordered by fanduel structed and mapped by p_map
@@ -494,9 +502,9 @@ class FDSlate:
                         raise Exception(f"Could not create 4-man stack for {stack}.")
                     pl2 = []
                     if stack in x_fallback:
-                        highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(fallback_stack_sample+1).index]
+                        highest = stack_df.loc[stack_df[stack_key].nlargest(fallback_stack_sample+1).index]
                     else:
-                        highest = stack_df.loc[stack_df['exp_ps_sp_pa'].nlargest(fallback_stack_sample).index]
+                        highest = stack_df.loc[stack_df[stack_key].nlargest(fallback_stack_sample).index]
                     #array of fanduel ids of the selected hitters
                     stack_ids = highest['fd_id'].values
                     samp = random.sample(sorted(stack_ids), 4)
@@ -776,6 +784,8 @@ class FDSlate:
                     salary -= utility['fd_salary'].item()
                     rem_sal = max_sal - salary
                     lineup[8] = hitter['fd_id']
+                    h_df = h[h['fd_id'].isin(lineup)]
+                    used_teams = h_df['team'].unique()
                 #same as above, but no fade_filt and increasing minimum thresehold by 100.
                 except (KeyError, ValueError):
                     try:
@@ -795,6 +805,8 @@ class FDSlate:
                         salary -= utility['fd_salary'].item()
                         rem_sal = max_sal - salary
                         lineup[8] = hitter['fd_id']
+                        h_df = h[h['fd_id'].isin(lineup)]
+                        used_teams = h_df['team'].unique()
                     except (KeyError, ValueError):
                         reset = True
                         print('resetting')
