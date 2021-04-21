@@ -32,33 +32,35 @@ stack_count = stack_auto['stacks'].nlargest(60)
 stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu']].sort_values(by='points', ascending=False)
 
 
-# def build_lineups(self, lus = 150, 
-#                       index_track = 0, 
-#                       max_surplus = 600, 
-#                       max_lu_total = 75,
-#                       max_lu_stack = 50, 
-#                       max_sal = 35000, 
-#                       stack_sample = 5, 
-#                       util_replace_filt = 0,
-#                       variance = 25, 
-#                       non_stack_quantile = .80, 
-#                       high_salary_quantile = .80,
-#                       enforce_pitcher_surplus = True,
-#                       enforce_hitter_surplus = True, 
-#                       non_stack_max_order=5, 
-#                       custom_counts={},
-#                       fallback_stack_sample = 6,
-#                       custom_stacks = None,
-#                       custom_pitchers = None,
-#                       x_fallback = [],
-#                       stack_only = [],
-#                       below_avg_count = 25,
-#                       stack_expand_limit = 15,
-#                       of_count_adjust = 6,
-#                       limit_risk = [],
-            #risk_limit should always be >= below_avg_count
-#                       risk_limit = 25,
-#                       exempt=[]):
+  # def build_lineups(self, lus = 150, 
+  #                     index_track = 0, 
+  #                     max_lu_total = 75,
+  #                     max_lu_stack = 50, 
+  #                     max_sal = 35000, 
+  #                     stack_sample = 5, 
+  #                     util_replace_filt = 0,
+  #                     variance = 25, 
+  #                     non_stack_quantile = .80, 
+  #                     high_salary_quantile = .80,
+  #                     enforce_pitcher_surplus = True,
+  #                     enforce_hitter_surplus = True, 
+  #                     non_stack_max_order=5, 
+  #                     custom_counts={},
+  #                     fallback_stack_sample = 6,
+  #                     custom_stacks = None,
+  #                     custom_pitchers = None,
+  #                     x_fallback = [],
+  #                     stack_only = [],
+  #                     below_avg_count = 25,
+  #                     stack_expand_limit = 15,
+  #                     of_count_adjust = 6,
+  #                     limit_risk = [],
+  #                     risk_limit = 25,
+  #                     exempt=[],
+  #                     stack_size = 4,
+  #                     secondary_stack_cut = 90,
+  #                     single_stack_surplus = 600,
+  #                     double_stack_surplus = 900):
 lineups = s.build_lineups(
                     variance = 25,
                     util_replace_filt = 100,
@@ -88,4 +90,5 @@ hitter_counts = hc_df.loc[hc_index, ['name', 't_count', 'team', 'fd_salary', 'po
 
 
 
-    
+
+
