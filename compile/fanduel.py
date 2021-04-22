@@ -357,7 +357,8 @@ class FDSlate:
                       stack_size = 4,
                       secondary_stack_cut = 90,
                       single_stack_surplus = 600,
-                      double_stack_surplus = 900):
+                      double_stack_surplus = 900,
+                      no_secondary = []):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
@@ -562,7 +563,7 @@ class FDSlate:
             plat_filt = (h['is_platoon'] != True)
             value_filt = ((h['fd_salary'] <= h['fd_salary'].median()) & (h['points'] >= h['points'].median()))
             if lus > secondary_stack_cut:
-                secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack}
+                secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
                 secondary_stack = random.choice(list(secondary_stacks.keys()))
                 max_surplus = double_stack_surplus
             else:
