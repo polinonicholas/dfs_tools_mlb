@@ -40,10 +40,12 @@ class IterTeam(type):
     
 class Team(metaclass=IterTeam):
     _all_teams = []
-    def __init__(self, mlb_id, name=''):
+    def __init__(self, mlb_id, name='', custom_lineup=None, custom_sp=None):
         self._all_teams.append(self)
         self.id = mlb_id
         self.name = name
+        self.custom_lineup = custom_lineup
+        self.custom_sp = custom_sp
     @cached_property
     def depth(self):
         file = pickle_path(name=f"{self.name}_depth_{tf.today}", directory=settings.DEPTH_DIR)
@@ -433,6 +435,8 @@ class Team(metaclass=IterTeam):
         return self.last_game_pk
     @cached_property
     def opp_sp(self):
+        if self.opp_instance.custom_sp:
+            return statsapi.get('people', {'personIds': self.opp_instance.custom_sp})['people'][0]
         if self.next_game_pk:
             daily_info = Team.daily_info()
             if self.opp_name not in daily_info['confirmed_sp']:
@@ -462,6 +466,8 @@ class Team(metaclass=IterTeam):
                 return statsapi.get('people', {'personIds': i_d})['people'][0]
         return self.next_game_pk
     def projected_sp(self):
+        if self.custom_sp:
+            return statsapi.get('people', {'personIds': self.custom_sp})['people'][0]
         if self.next_game_pk:
             daily_info = Team.daily_info()
             if self.name not in daily_info['confirmed_sp']:
@@ -573,6 +579,8 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def lineup(self):
+        if self.custom_lineup:
+            return self.custom_lineup
         if self.next_game_pk:
             daily_info = Team.daily_info()
             if self.name in daily_info["confirmed_lu"]:
@@ -693,7 +701,7 @@ class Team(metaclass=IterTeam):
                 fg_stats = Stats.current_stats()
                 h_df = sm_merge(h_df, fg_stats, columns=['name', 'team'], ratios=[.63, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('', '_fg'))
                 h_df = drop(h_df)
-            h_df = h_df[((~h_df['position'].astype(str).isin(mac.players.p)) & (h_df['mlb_id'] != 660271))]
+            h_df = h_df[~((h_df['position'].astype(str).isin(mac.players.p)) & (h_df['mlb_id'] != 660271))]
             if not self.is_dh and len(h_df.index) == 9:
                 h_key = 'fd_wps_pa_' + self.o_split
                 i_d = h_df.loc[h_df[h_key].idxmin(), 'mlb_id'].item()
@@ -1331,7 +1339,7 @@ twins = Team(mlb_id = 142, name = 'twins')
 phillies = Team(mlb_id = 143, name = 'phillies')
 braves = Team(mlb_id = 144, name = 'braves')
 white_sox = Team(mlb_id = 145, name = 'white sox')
-marlins = Team(mlb_id = 146, name = 'marlins')
+marlins = Team(mlb_id = 146, name = 'marlins', custom_lineup=[572816, 500743, 542583, 594807, 605119, 665862, 621446, 595453, 641447])
 yankees = Team(mlb_id = 147, name = 'yankees')
 brewers = Team(mlb_id = 158, name = 'brewers')
 angels = Team(mlb_id = 108, name = 'angels')
@@ -1343,10 +1351,12 @@ reds = Team(mlb_id = 113, name = 'reds')
 indians = Team(mlb_id = 114, name = 'indians')
 rockies = Team(mlb_id = 115, name = 'rockies')
 tigers = Team(mlb_id = 116, name = 'tigers')
-astros = Team(mlb_id = 117, name = 'astros')
+astros = Team(mlb_id = 117, name = 'astros', )
 royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
+
 
 

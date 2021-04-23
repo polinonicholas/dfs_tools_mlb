@@ -355,7 +355,7 @@ class FDSlate:
                       risk_limit = 25,
                       exempt=[],
                       stack_size = 4,
-                      secondary_stack_cut = 90,
+                      secondary_stack_cut = 75,
                       single_stack_surplus = 600,
                       double_stack_surplus = 900,
                       no_secondary = []):
@@ -563,9 +563,15 @@ class FDSlate:
             plat_filt = (h['is_platoon'] != True)
             value_filt = ((h['fd_salary'] <= h['fd_salary'].median()) & (h['points'] >= h['points'].median()))
             if lus > secondary_stack_cut:
-                secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
-                secondary_stack = random.choice(list(secondary_stacks.keys()))
-                max_surplus = double_stack_surplus
+                try:
+                    secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
+                    secondary_stack = random.choice(list(secondary_stacks.keys()))
+                    max_surplus = double_stack_surplus
+                except IndexError:
+                    secondary_stacks = {k:v for k,v in s.items() if v > -1 and k != p_info[2] and k != stack and k not in no_secondary}
+                    secondary_stack = random.choice(list(secondary_stacks.keys()))
+                    max_surplus = double_stack_surplus
+                    
             else:
                 secondary_stack = None
                 max_surplus = single_stack_surplus
@@ -684,38 +690,29 @@ class FDSlate:
                 idx = p_map[ps]
                 lineup[idx] = h_id
             #if remaining salary is greater than specified arg max_surplus
-            if not reset and enforce_hitter_surplus and rem_sal > max_surplus:
-                random.shuffle(needed_pos)    
-                for ps in needed_pos:
-                    if rem_sal < max_surplus:
-                        break
-                    idx = p_map[ps]
-                    selected = h[h['fd_id'] == lineup[idx]]
-                    s_sal = selected['fd_salary'].item()
-                    if s_sal < h['fd_salary'].quantile(high_salary_quantile):
-                        #filter out players already in lineup, lineup will change with each iteration
-                        dupe_filt = (~h['fd_id'].isin(lineup))
-                        #filter out players going against current lineup's pitcher
-                        opp_filt = (h['opp'] != p_info[3])
-                        #filter out players not eligible for the current position being filled.
-                        if 'of' in ps:
-                            pos_filt = (h['fd_position'].apply(lambda x: 'of' in x))
-                        elif 'util' in ps:
-                            pos_filt = (h['fd_r_position'].apply(lambda x: ps in x))  
-                        else:
-                            pos_filt = (h['fd_position'].apply(lambda x: ps in x))
-                        #filter out players with a salary less than high_salary_quantile arg
-                        sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
-                        hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
-                        if len(hitters.index) > 0:
-                            hitter = hitters.loc[hitters[non_stack_key].idxmax()]
-                            n_sal = hitter['fd_salary'].item()
-                            salary -= s_sal
-                            salary += n_sal
-                            rem_sal = max_sal - salary
-                            lineup[idx] = hitter['fd_id']
-                        else:
-                            sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
+            if lus % 2 == 0:
+                if not reset and enforce_hitter_surplus and rem_sal > max_surplus:
+                    random.shuffle(needed_pos)    
+                    for ps in needed_pos:
+                        if rem_sal < max_surplus:
+                            break
+                        idx = p_map[ps]
+                        selected = h[h['fd_id'] == lineup[idx]]
+                        s_sal = selected['fd_salary'].item()
+                        if s_sal < h['fd_salary'].quantile(high_salary_quantile):
+                            #filter out players already in lineup, lineup will change with each iteration
+                            dupe_filt = (~h['fd_id'].isin(lineup))
+                            #filter out players going against current lineup's pitcher
+                            opp_filt = (h['opp'] != p_info[3])
+                            #filter out players not eligible for the current position being filled.
+                            if 'of' in ps:
+                                pos_filt = (h['fd_position'].apply(lambda x: 'of' in x))
+                            elif 'util' in ps:
+                                pos_filt = (h['fd_r_position'].apply(lambda x: ps in x))  
+                            else:
+                                pos_filt = (h['fd_position'].apply(lambda x: ps in x))
+                            #filter out players with a salary less than high_salary_quantile arg
+                            sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
                             hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
                             if len(hitters.index) > 0:
                                 hitter = hitters.loc[hitters[non_stack_key].idxmax()]
@@ -724,32 +721,110 @@ class FDSlate:
                                 salary += n_sal
                                 rem_sal = max_sal - salary
                                 lineup[idx] = hitter['fd_id']
+                            else:
+                                sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
+                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                                if len(hitters.index) > 0:
+                                    hitter = hitters.loc[hitters[non_stack_key].idxmax()]
+                                    n_sal = hitter['fd_salary'].item()
+                                    salary -= s_sal
+                                    salary += n_sal
+                                    rem_sal = max_sal - salary
+                                    lineup[idx] = hitter['fd_id']
+                    
+                if not reset and enforce_pitcher_surplus and rem_sal > max_surplus:
+                    #filter out pitchers who would put the salary over the max_sal if inserted
+                    current_pitcher = p.loc[pi]
+                    cp_sal = current_pitcher['fd_salary'].item()
+                    p_sal_filt = (p['fd_salary'] <= max_sal - (salary - cp_sal))
+                    #filter out pitchers not being used for slate.
+                    p_teams = p.loc[pd.keys(), 'team'].values
+                    p_team_filt = (p['team'].isin(p_teams))
+                    #filter out pitchers going against teams already in lineup
+                    h_df = h[h['fd_id'].isin(lineup)]
+                    used_teams=h_df['team'].unique()
+                    p_opp_filt = (~p['opp'].isin(used_teams))
+                    replacements = p[p_sal_filt & p_team_filt & p_opp_filt]
+                    #if a pitcher meeting parameters exists, insert in lineup, else leave lineup as is.
+                    if len(replacements.index) > 1:
+                        new_pitcher = replacements.loc[replacements['fd_salary'].idxmax()]
+                        pi = replacements['fd_salary'].idxmax()
+                        p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
+                        np_id = new_pitcher['fd_id']
+                        np_sal = new_pitcher['fd_salary']
+                        #subtract replaced pitcher's salary, add new pitcher's salary
+                        salary -= cp_sal
+                        salary += np_sal
+                        rem_sal = max_sal - salary
+                        lineup[0] = np_id
+            else:
                 
-            if not reset and enforce_pitcher_surplus and rem_sal > max_surplus:
-                #filter out pitchers who would put the salary over the max_sal if inserted
-                current_pitcher = p.loc[pi]
-                cp_sal = current_pitcher['fd_salary'].item()
-                p_sal_filt = (p['fd_salary'] <= max_sal - (salary - cp_sal))
-                #filter out pitchers not being used for slate.
-                p_teams = p.loc[pd.keys(), 'team'].values
-                p_team_filt = (p['team'].isin(p_teams))
-                #filter out pitchers going against teams already in lineup
-                h_df = h[h['fd_id'].isin(lineup)]
-                used_teams=h_df['team'].unique()
-                p_opp_filt = (~p['opp'].isin(used_teams))
-                replacements = p[p_sal_filt & p_team_filt & p_opp_filt]
-                #if a pitcher meeting parameters exists, insert in lineup, else leave lineup as is.
-                if len(replacements.index) > 1:
-                    new_pitcher = replacements.loc[replacements['fd_salary'].idxmax()]
-                    pi = replacements['fd_salary'].idxmax()
-                    p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
-                    np_id = new_pitcher['fd_id']
-                    np_sal = new_pitcher['fd_salary']
-                    #subtract replaced pitcher's salary, add new pitcher's salary
-                    salary -= cp_sal
-                    salary += np_sal
-                    rem_sal = max_sal - salary
-                    lineup[0] = np_id
+                if not reset and enforce_pitcher_surplus and rem_sal > max_surplus:
+                    #filter out pitchers who would put the salary over the max_sal if inserted
+                    current_pitcher = p.loc[pi]
+                    cp_sal = current_pitcher['fd_salary'].item()
+                    p_sal_filt = (p['fd_salary'] <= max_sal - (salary - cp_sal))
+                    #filter out pitchers not being used for slate.
+                    p_teams = p.loc[pd.keys(), 'team'].values
+                    p_team_filt = (p['team'].isin(p_teams))
+                    #filter out pitchers going against teams already in lineup
+                    h_df = h[h['fd_id'].isin(lineup)]
+                    used_teams=h_df['team'].unique()
+                    p_opp_filt = (~p['opp'].isin(used_teams))
+                    replacements = p[p_sal_filt & p_team_filt & p_opp_filt]
+                    #if a pitcher meeting parameters exists, insert in lineup, else leave lineup as is.
+                    if len(replacements.index) > 1:
+                        new_pitcher = replacements.loc[replacements['fd_salary'].idxmax()]
+                        pi = replacements['fd_salary'].idxmax()
+                        p_info = p.loc[pi, ['fd_id', 'fd_salary', 'opp', 'team']].values
+                        np_id = new_pitcher['fd_id']
+                        np_sal = new_pitcher['fd_salary']
+                        #subtract replaced pitcher's salary, add new pitcher's salary
+                        salary -= cp_sal
+                        salary += np_sal
+                        rem_sal = max_sal - salary
+                        lineup[0] = np_id
+                if not reset and enforce_hitter_surplus and rem_sal > max_surplus:
+                    random.shuffle(needed_pos)    
+                    for ps in needed_pos:
+                        if rem_sal < max_surplus:
+                            break
+                        idx = p_map[ps]
+                        selected = h[h['fd_id'] == lineup[idx]]
+                        s_sal = selected['fd_salary'].item()
+                        if s_sal < h['fd_salary'].quantile(high_salary_quantile):
+                            #filter out players already in lineup, lineup will change with each iteration
+                            dupe_filt = (~h['fd_id'].isin(lineup))
+                            #filter out players going against current lineup's pitcher
+                            opp_filt = (h['opp'] != p_info[3])
+                            #filter out players not eligible for the current position being filled.
+                            if 'of' in ps:
+                                pos_filt = (h['fd_position'].apply(lambda x: 'of' in x))
+                            elif 'util' in ps:
+                                pos_filt = (h['fd_r_position'].apply(lambda x: ps in x))  
+                            else:
+                                pos_filt = (h['fd_position'].apply(lambda x: ps in x))
+                            #filter out players with a salary less than high_salary_quantile arg
+                            sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
+                            hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                            if len(hitters.index) > 0:
+                                hitter = hitters.loc[hitters[non_stack_key].idxmax()]
+                                n_sal = hitter['fd_salary'].item()
+                                salary -= s_sal
+                                salary += n_sal
+                                rem_sal = max_sal - salary
+                                lineup[idx] = hitter['fd_id']
+                            else:
+                                sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
+                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                                if len(hitters.index) > 0:
+                                    hitter = hitters.loc[hitters[non_stack_key].idxmax()]
+                                    n_sal = hitter['fd_salary'].item()
+                                    salary -= s_sal
+                                    salary += n_sal
+                                    rem_sal = max_sal - salary
+                                    lineup[idx] = hitter['fd_id']
+                
                 
             #if there aren't enough teams being used, replace the utility player with a team not in use.    
             h_df = h[h['fd_id'].isin(lineup)]
