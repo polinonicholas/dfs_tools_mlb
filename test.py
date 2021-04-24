@@ -27,7 +27,6 @@ hitters = s.get_hitters()
 
 p_auto = s.p_lu_df()['lus'].to_dict()
 
-stack_auto.index
 
 stack_auto = s.stacks_df()
 stack_count = stack_auto['stacks'].nlargest(60)
@@ -66,7 +65,7 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       no_secondary = []):
 lineups = s.build_lineups(
 
-                    variance = 30,
+                    variance = 50,
                     util_replace_filt = 200,
                     custom_stacks = None,
                     custom_pitchers = None,
