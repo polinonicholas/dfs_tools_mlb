@@ -1351,12 +1351,14 @@ reds = Team(mlb_id = 113, name = 'reds')
 indians = Team(mlb_id = 114, name = 'indians')
 rockies = Team(mlb_id = 115, name = 'rockies')
 tigers = Team(mlb_id = 116, name = 'tigers')
-astros = Team(mlb_id = 117, name = 'astros', )
+astros = Team(mlb_id = 117, name = 'astros')
 royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
+#dodgers
 
+#astros
 
-
+ 

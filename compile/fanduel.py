@@ -79,8 +79,11 @@ class FDSlate:
             
             df.columns = df.columns.str.lower()
             df = modify_team_name(df, columns = ['team', 'opp'])
+            df.loc[df['fd_position'].isna(), 'fd_position'] = 'xxxx'
+            df.loc[df['fd_r_position'].isna(), 'fd_r_position'] = 'xxxx'
             df['fd_position'] = df['fd_position'].str.replace('C', '1B').str.lower().str.split('/')
             df['fd_r_position'] = df['fd_r_position'].str.lower().str.split('/')
+            
             p_idx = df[df['fd_position'].apply(lambda x: 'p' in x)].index
             df.loc[p_idx, 'is_p'] = True
             h_idx = df[df['fd_r_position'].apply(lambda x: 'util' in x)].index
@@ -358,6 +361,7 @@ class FDSlate:
                       secondary_stack_cut = 75,
                       single_stack_surplus = 600,
                       double_stack_surplus = 900,
+                      pitcher_surplus = 500,
                       no_secondary = []):
         max_order = self.max_batting_order
         # all hitters in slate
@@ -563,16 +567,19 @@ class FDSlate:
             plat_filt = (h['is_platoon'] != True)
             value_filt = ((h['fd_salary'] <= h['fd_salary'].median()) & (h['points'] >= h['points'].median()))
             if lus > secondary_stack_cut:
+                enforce_hitter_surplus = False
                 try:
                     secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
                     secondary_stack = random.choice(list(secondary_stacks.keys()))
                     max_surplus = double_stack_surplus
+                    
                 except IndexError:
                     secondary_stacks = {k:v for k,v in s.items() if v > -1 and k != p_info[2] and k != stack and k not in no_secondary}
                     secondary_stack = random.choice(list(secondary_stacks.keys()))
                     max_surplus = double_stack_surplus
                     
             else:
+                enforce_hitter_surplus = True
                 secondary_stack = None
                 max_surplus = single_stack_surplus
             secondary_stack_filt = (h['team'] == secondary_stack)
@@ -732,7 +739,7 @@ class FDSlate:
                                     rem_sal = max_sal - salary
                                     lineup[idx] = hitter['fd_id']
                     
-                if not reset and enforce_pitcher_surplus and rem_sal > max_surplus:
+                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus:
                     #filter out pitchers who would put the salary over the max_sal if inserted
                     current_pitcher = p.loc[pi]
                     cp_sal = current_pitcher['fd_salary'].item()
@@ -759,7 +766,7 @@ class FDSlate:
                         lineup[0] = np_id
             else:
                 
-                if not reset and enforce_pitcher_surplus and rem_sal > max_surplus:
+                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus:
                     #filter out pitchers who would put the salary over the max_sal if inserted
                     current_pitcher = p.loc[pi]
                     cp_sal = current_pitcher['fd_salary'].item()

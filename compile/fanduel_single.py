@@ -16,13 +16,9 @@ class FDSlateSingle:
                  entries_file=config.get_fd_file(), 
                  slate_number = 1, 
                  lineups = 150,
-                
-                 
                  stack_points_weight = 2, 
                  stack_threshold = 120, 
-                 
                  heavy_weight_stack=False, 
-                
                  max_batting_order=7,
                  h_fades=[]):
         
@@ -169,7 +165,7 @@ class FDSlateSingle:
         lineups = self.lineups
         df = self.points_df()
         
-        df.drop(index = i, inplace=True)
+       
         df['p_z'] = ((df['points'] - df['points'].mean()) / df['points'].std()) * self.points_weight
         df['s_z'] = ((df['salary'] - df['salary'].mean()) / df['salary'].std()) * -(2 - self.points_weight)
         df['stacks'] = 1000
@@ -218,33 +214,21 @@ class FDSlateSingle:
             return "No lineups stored yet."
         
     
-    def build_lineups(self, lus = 150, 
+    def build_lineups(self, 
+                      lus = 150, 
                       index_track = 0, 
                       max_lu_total = 90,
-                      max_lu_stack = 75, 
                       max_sal = 35000, 
-                      stack_sample = 6, 
-                      util_replace_filt = 200,
+                      stack_sample = 4, 
+                      util_replace_filt = 1000,
                       variance = 0, 
-                      non_stack_quantile = .80, 
-                      high_salary_quantile = .80,
-                      
-                      enforce_hitter_surplus = True, 
                       non_stack_max_order=5, 
                       custom_counts={},
-                      fallback_stack_sample = 6,
                       custom_stacks = None,
-                      
-                      x_fallback = [],
-                      
                       below_avg_count = 30,
                       stack_expand_limit = 30,
-                     
-                      
                       exempt=[],
-                      stack_size = 4,
-                      
-                      
+                      full_stack_cutoff = 50
                       ):
         max_order = self.max_batting_order
         # all hitters in slate
@@ -264,9 +248,6 @@ class FDSlateSingle:
         h.loc[(h['exp_ps_sp_pa'] < h['exp_ps_sp_pa'].median()),'t_count'] = below_avg_count
         exempt_filt = (h['fd_id'].isin(exempt))
         h.loc[exempt_filt, 't_count'] = 0
-        
-        
-        
         for k,v in custom_counts.items():
             h.loc[h['fd_id'] == k, 't_count'] = v
         # team: stacks to build
@@ -274,34 +255,36 @@ class FDSlateSingle:
             s = self.stacks_df()['stacks'].to_dict()
         else:
             s = custom_stacks
-        
-        
         #lineups to build
         sorted_lus = []
         while lus > 0:
             salary = 0
             #if lineup fails requirements, reset will be set to true.
             reset = False
+            if lus > full_stack_cutoff:
+                stack_size = 4
+            else:
+                stack_size = 3
             
             stacks = {k:v for k,v in s.items() if v > 0}
             stack = random.choice(list(stacks.keys()))
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
             stack_df = h[h['team'] == stack]
-            stack_key = 'exp_ps_sp_pa'
-            non_stack_key = 'exp_ps_sp_pa'
-            # if remaining_stacks % 4 == 0:
-            #     stack_key = 'total_pitches'
-            # elif remaining_stacks % 3 == 0:
-            #     stack_key = 'fd_hr_weight'
-            # elif remaining_stacks % 2 == 0:
-            #     stack_key = 'points'
-            # else:
-            #     stack_key = 'exp_ps_sp_pa'
-            # if lus % 2 == 0:
-            #     non_stack_key='exp_ps_sp_pa'
-            # else:
-            #     non_stack_key='points'
+            # stack_key = 'exp_ps_sp_pa'
+            # non_stack_key = 'exp_ps_sp_pa'
+            if remaining_stacks % 4 == 0:
+                stack_key = 'total_pitches'
+            elif remaining_stacks % 3 == 0:
+                stack_key = 'fd_hr_weight'
+            elif remaining_stacks % 2 == 0:
+                stack_key = 'points'
+            else:
+                stack_key = 'exp_ps_sp_pa'
+            if lus % 2 == 0:
+                non_stack_key='exp_ps_sp_pa'
+            else:
+                non_stack_key='points'
             #filter the selected stack by stack_sample arg.
             if remaining_stacks > stack_expand_limit:
                 highest = stack_df.loc[stack_df[stack_key].nlargest(stack_sample+1).index]
@@ -397,11 +380,20 @@ class FDSlateSingle:
                                  
                                     
                 
-            h_id = hitter['fd_id']
-            lineup[y] = h_id
-            used_players = []
+                    h_id = hitter['fd_id']
+                    lineup[y] = h_id
+                    used_players = []
+                    print(lineup)
             
-            while not reset and sorted(lineup) in sorted_lus:
+            while not reset and lineup[0:2] + sorted(lineup[2:5]) in sorted_lus:
+                mvp = lineup[0]
+                all_star = lineup[1]
+                potential_lu = lineup[0:2] + sorted(lineup[2:5])
+                potential_lu[0] = all_star
+                potential_lu[1] = mvp
+                if potential_lu not in sorted_lus:
+                    lineup = potential_lu
+                    break
                 try:
                     #redeclare use_teams each pass
                     h_df = h[h['fd_id'].isin(lineup)]
@@ -454,7 +446,7 @@ class FDSlateSingle:
             #decrease lus arg, loop ends at 0.
             lus -=1
             #append the new lineup to the sorted lus list for next loop.
-            sorted_lus.append(sorted(lineup))
+            sorted_lus.append(lineup[0:2] + sorted(lineup[2:5]))
             #insert the lineup in the lineup df
             self.insert_lineup(index_track, lineup)
             #increase index for next lineup insertion.
