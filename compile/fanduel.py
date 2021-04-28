@@ -362,7 +362,9 @@ class FDSlate:
                       single_stack_surplus = 600,
                       double_stack_surplus = 900,
                       pitcher_surplus = 500,
-                      no_secondary = []):
+                      no_secondary = [],
+                      lock = [],
+                      no_surplus_secondary_stacks=True):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
@@ -567,7 +569,8 @@ class FDSlate:
             plat_filt = (h['is_platoon'] != True)
             value_filt = ((h['fd_salary'] <= h['fd_salary'].median()) & (h['points'] >= h['points'].median()))
             if lus > secondary_stack_cut:
-                enforce_hitter_surplus = False
+                if no_surplus_secondary_stacks:
+                    enforce_hitter_surplus = False
                 try:
                     secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
                     secondary_stack = random.choice(list(secondary_stacks.keys()))
@@ -739,7 +742,7 @@ class FDSlate:
                                     rem_sal = max_sal - salary
                                     lineup[idx] = hitter['fd_id']
                     
-                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus:
+                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus and p_info[0] not in lock:
                     #filter out pitchers who would put the salary over the max_sal if inserted
                     current_pitcher = p.loc[pi]
                     cp_sal = current_pitcher['fd_salary'].item()
@@ -766,7 +769,7 @@ class FDSlate:
                         lineup[0] = np_id
             else:
                 
-                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus:
+                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus and p_info[0] not in lock:
                     #filter out pitchers who would put the salary over the max_sal if inserted
                     current_pitcher = p.loc[pi]
                     cp_sal = current_pitcher['fd_salary'].item()

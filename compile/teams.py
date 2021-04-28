@@ -1357,8 +1357,5 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
-#dodgers
-
-#astros
 
  

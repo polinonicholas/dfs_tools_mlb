@@ -19,8 +19,8 @@ pd.set_option('display.max_columns', None)
 s=FDSlate(
     
           p_fades = [],
-          h_fades = ['57822-82440'],
-         
+          h_fades = [],
+          no_stack = []
           )
 
 pitchers = s.get_pitchers()
@@ -28,10 +28,10 @@ hitters = s.get_hitters()
 
 p_auto = s.p_lu_df()['lus'].to_dict()
 
+
 stack_auto = s.stacks_df()
 stack_count = stack_auto['stacks'].nlargest(60)
 stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu']].sort_values(by='points', ascending=False)
-
 
 
 # def build_lineups(self, lus = 150, 
@@ -64,51 +64,54 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       single_stack_surplus = 600,
 #                       double_stack_surplus = 900,
 #                       pitcher_surplus=500,
-#                       no_secondary = []):
+#                       no_secondary = [],
+#                       lock=[],
+#                       no_surplus_secondary_stacks=True):
 lineups = s.build_lineups(
 
                     variance = 25,
                     util_replace_filt = 200,
-                    custom_stacks = {'yankees': 30,
+                    custom_stacks = {
+ 'mets': 10,
+ 'nationals': 20,
+ 'yankees': 20,
+ 'rays': 10,
  
- 'brewers': 5,
- 'dodgers': 5,
- 'astros': 25,
+ 'dodgers': 15,
+ 'white sox': 0,
+ 'padres': 10,
  
+ 
+ 'blue jays': 0,
+ 
+ 
+ 
+ 'angels': 10,
  'phillies': 0,
+ 'rangers': 0,
+ 'braves': 20,
+ 'cardinals': 0,
  
  
- 'angels': 15,
- 'rangers': 15,
+ 'orioles': 25,
  
- 'braves': 15,
- 'cardinals': 5,
- 'mariners': 15,
- 'orioles': 15,
- 'cubs': 5,
+ 'cubs': 10,
+ 'athletics': 0,
  },
-                    custom_pitchers = {1: 15,
- 2: 15,
- 5: 15,
- 
- 9: 15,
- 
- 13: 60,
- 14: 0,
- 15: 150},
+                    custom_pitchers = {10: 150, 14: 20, 12: 75},
                     x_fallback = [],
-                    secondary_stack_cut = 75,
+                    secondary_stack_cut = 0,
                     stack_expand_limit = 15,
                     single_stack_surplus = 300,
-                    pitcher_surplus=1500,
-                    no_secondary = ['dodgers', 'cardinals', 'brewers'],
+                    double_stack_surplus = 1200,
+                    no_secondary = [],
                     limit_risk = [],
                     below_avg_count = 15,
-                    exempt=['57822-68588',
-                            '57822-52150'],
-                    enforce_pitcher_surplus = True,
-                    enforce_hitter_surplus = True,
-                    
+                    pitcher_surplus=1100,
+                    exempt=[],
+                    lock=['57915-52198'],
+                    stack_only = [],
+                    no_surplus_secondary_stacks=True
                     
                     )
 

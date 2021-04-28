@@ -64,7 +64,9 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       single_stack_surplus = 600,
 #                       double_stack_surplus = 900,
 #                       pitcher_surplus=500,
-#                       no_secondary = []):
+#                       no_secondary = [],
+#                       lock=[],
+#                       no_surplus_secondary_stacks=True):
 lineups = s.build_lineups(
 
                     variance = 25,
@@ -79,7 +81,11 @@ lineups = s.build_lineups(
                     no_secondary = [],
                     limit_risk = [],
                     below_avg_count = 15,
+                    pitcher_surplus=500,
                     exempt=[],
+                    lock=[],
+                    stack_only = [],
+                    no_surplus_secondary_stacks=True
                     
                     )
 
