@@ -20,7 +20,11 @@ s=FDSlate(
     
           p_fades = [],
           h_fades = [],
-          no_stack = []
+          no_stack = [],
+          max_batting_order=7,
+          stack_threshold = 35, 
+          
+          
           )
 
 pitchers = s.get_pitchers()
@@ -51,6 +55,7 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       fallback_stack_sample = 6,
 #                       custom_stacks = None,
 #                       custom_pitchers = None,
+#                       custom_secondary = None,
 #                       x_fallback = [],
 #                       stack_only = [],
 #                       below_avg_count = 25,
@@ -63,55 +68,35 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       secondary_stack_cut = 75,
 #                       single_stack_surplus = 600,
 #                       double_stack_surplus = 900,
-#                       pitcher_surplus=500,
+#                       pitcher_surplus = 500,
 #                       no_secondary = [],
-#                       lock=[],
-#                       no_surplus_secondary_stacks=True):
+#                       lock = [],
+#                       no_surplus_secondary_stacks=True,
+#                       no_surplus_cut = 75):
 lineups = s.build_lineups(
 
                     variance = 25,
                     util_replace_filt = 200,
-                    custom_stacks = {
- 'mets': 10,
- 'nationals': 20,
- 'yankees': 20,
- 'rays': 10,
- 
- 'dodgers': 15,
- 'white sox': 0,
- 'padres': 10,
- 
- 
- 'blue jays': 0,
- 
- 
- 
- 'angels': 10,
- 'phillies': 0,
- 'rangers': 0,
- 'braves': 20,
- 'cardinals': 0,
- 
- 
- 'orioles': 25,
- 
- 'cubs': 10,
- 'athletics': 0,
- },
-                    custom_pitchers = {10: 150, 14: 20, 12: 75},
+                    custom_stacks = None,
+                    custom_secondary = None,
+                    custom_pitchers = None,
                     x_fallback = [],
-                    secondary_stack_cut = 0,
+                    secondary_stack_cut = 50,
+                    no_surplus_cut=0,
                     stack_expand_limit = 15,
                     single_stack_surplus = 300,
                     double_stack_surplus = 1200,
                     no_secondary = [],
                     limit_risk = [],
                     below_avg_count = 15,
-                    pitcher_surplus=1100,
+                    pitcher_surplus=500,
                     exempt=[],
-                    lock=['57915-52198'],
+                    lock=[''],
                     stack_only = [],
-                    no_surplus_secondary_stacks=True
+                    no_surplus_secondary_stacks=True,
+                    non_stack_max_order=5, 
+                    stack_sample = 5, 
+                    custom_counts={},
                     
                     )
 

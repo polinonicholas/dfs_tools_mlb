@@ -349,6 +349,7 @@ class FDSlate:
                       fallback_stack_sample = 6,
                       custom_stacks = None,
                       custom_pitchers = None,
+                      custom_secondary = None,
                       x_fallback = [],
                       stack_only = [],
                       below_avg_count = 25,
@@ -364,7 +365,8 @@ class FDSlate:
                       pitcher_surplus = 500,
                       no_secondary = [],
                       lock = [],
-                      no_surplus_secondary_stacks=True):
+                      no_surplus_secondary_stacks=True,
+                      no_surplus_cut = 75):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
@@ -406,6 +408,10 @@ class FDSlate:
             s = self.stacks_df()['stacks'].to_dict()
         else:
             s = custom_stacks
+        if not custom_secondary:
+            secondary = self.stacks_df()['stacks'].to_dict()
+        else:
+            secondary = custom_secondary
         
         sorted_lus = []
         p_map = {
@@ -422,6 +428,7 @@ class FDSlate:
         
         #lineups to build
         while lus > 0:
+            print(secondary)
             #if lineup fails requirements, reset will be set to true.
             reset = False
             
@@ -447,6 +454,8 @@ class FDSlate:
                 print('continuing')
                 print(stack)
                 print(p_info)
+                
+                
                 continue
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
@@ -569,23 +578,28 @@ class FDSlate:
             plat_filt = (h['is_platoon'] != True)
             value_filt = ((h['fd_salary'] <= h['fd_salary'].median()) & (h['points'] >= h['points'].median()))
             if lus > secondary_stack_cut:
-                if no_surplus_secondary_stacks:
+                if no_surplus_secondary_stacks and lus > no_surplus_cut:
                     enforce_hitter_surplus = False
+                else:
+                    enforce_hitter_surplus = True
+                    
                 try:
-                    secondary_stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
+                    secondary_stacks = {k:v for k,v in secondary.items() if v > 0 and k != p_info[2] and k != stack and k not in no_secondary}
                     secondary_stack = random.choice(list(secondary_stacks.keys()))
                     max_surplus = double_stack_surplus
                     
                 except IndexError:
-                    secondary_stacks = {k:v for k,v in s.items() if v > -1 and k != p_info[2] and k != stack and k not in no_secondary}
+                    secondary_stacks = {k:v for k,v in secondary.items() if v > -1 and k != p_info[2] and k != stack and k not in no_secondary}
                     secondary_stack = random.choice(list(secondary_stacks.keys()))
                     max_surplus = double_stack_surplus
+                secondary[secondary_stack] -= 1
                     
             else:
                 enforce_hitter_surplus = True
                 secondary_stack = None
                 max_surplus = single_stack_surplus
             secondary_stack_filt = (h['team'] == secondary_stack)
+            
             
             for ps in needed_pos:
                 #filter out players already in lineup, lineup will change with each iteration

@@ -27,7 +27,7 @@ from dfs_tools_mlb.dataframes.stat_splits import (h_splits, p_splits, h_q, h_q_v
                                                   p_q_r_vr, h_l_vl,h_l_vr,h_r_vr,h_r_vl,hp_q)
 
 
-p_q_rp['ra-_b_rp'].mean()
+
 
 
 
@@ -1357,5 +1357,3 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
-
- 

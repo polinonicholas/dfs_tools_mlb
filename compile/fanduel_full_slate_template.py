@@ -20,7 +20,11 @@ s=FDSlate(
     
           p_fades = [],
           h_fades = [],
-          no_stack = []
+          no_stack = [],
+          max_batting_order=7,
+          stack_threshold = 35, 
+          
+          
           )
 
 pitchers = s.get_pitchers()
@@ -51,6 +55,7 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       fallback_stack_sample = 6,
 #                       custom_stacks = None,
 #                       custom_pitchers = None,
+#                       custom_secondary = None,
 #                       x_fallback = [],
 #                       stack_only = [],
 #                       below_avg_count = 25,
@@ -63,18 +68,21 @@ stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu
 #                       secondary_stack_cut = 75,
 #                       single_stack_surplus = 600,
 #                       double_stack_surplus = 900,
-#                       pitcher_surplus=500,
+#                       pitcher_surplus = 500,
 #                       no_secondary = [],
-#                       lock=[],
-#                       no_surplus_secondary_stacks=True):
+#                       lock = [],
+#                       no_surplus_secondary_stacks=True,
+#                       no_surplus_cut = 75):
 lineups = s.build_lineups(
 
                     variance = 25,
                     util_replace_filt = 200,
                     custom_stacks = None,
+                    custom_secondary = None,
                     custom_pitchers = None,
                     x_fallback = [],
-                    secondary_stack_cut = 0,
+                    secondary_stack_cut = 50,
+                    no_surplus_cut=0,
                     stack_expand_limit = 15,
                     single_stack_surplus = 300,
                     double_stack_surplus = 1200,
@@ -83,9 +91,12 @@ lineups = s.build_lineups(
                     below_avg_count = 15,
                     pitcher_surplus=500,
                     exempt=[],
-                    lock=[],
+                    lock=[''],
                     stack_only = [],
-                    no_surplus_secondary_stacks=True
+                    no_surplus_secondary_stacks=True,
+                    non_stack_max_order=5, 
+                    stack_sample = 5, 
+                    custom_counts={},
                     
                     )
 

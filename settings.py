@@ -60,7 +60,8 @@ stat_splits ={
 stat_range = {
     'start': 2016,
     'end' : 2022,
-    'player_start': 2019
+    #currently must manually change _year columns in dataframes.stat_splits for pitchers
+    'player_start': 2020
     }
 
 

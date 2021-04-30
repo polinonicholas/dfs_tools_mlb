@@ -1,6 +1,6 @@
 from dfs_tools_mlb.compile import teams
 
-t = teams.dodgers
+t = teams.giants
 # t.projected_sp()
 
 
@@ -17,7 +17,7 @@ pitchers = t.pitcher
 
 
 
-dodgers = [605141, 608369, 457759, 571970, 669257, 621035, 666158, 670042, 621111]
+dodgers = [600303, 474832, 446334, 543105, 457763, 543063, 596103, 643289, 622072]
 
 
 
