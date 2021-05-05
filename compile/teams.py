@@ -749,6 +749,8 @@ class Team(metaclass=IterTeam):
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'fd_wpa_pa_vr'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'fd_wpa_pa_vl'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[(h_df['pa'] < 50) | (h_df['fd_wpa_pa'].isna()), 'fd_wpa_pa'] = hp_q['fd_wpa_pa'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vr'] = hp_q['k_pa'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vl'] = hp_q['k_pa'].median()
 
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & righties, 'pitches_pa_vr'] = h_r_vr['pitches_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & lefties, 'pitches_pa_vl'] = h_l_vl['pitches_pa_vl'].median()
@@ -757,12 +759,19 @@ class Team(metaclass=IterTeam):
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & righties, 'fd_wpa_pa_vr'] = h_r_vr['fd_wpa_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & lefties, 'fd_wpa_pa_vl'] = h_l_vl['fd_wpa_pa_vl'].median()
             
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & righties, 'k_pa_vr'] = h_r_vr['k_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & lefties, 'k_pa_vl'] = h_l_vl['k_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & lefties, 'k_pa_vr'] = h_l_vr['k_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & righties, 'k_pa_vl'] = h_r_vl['k_pa_vl'].median()
+            
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & lefties, 'pitches_pa_vr'] = h_l_vr['pitches_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & righties, 'pitches_pa_vl'] = h_r_vl['pitches_pa_vl'].median()
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wps_pa_vr'].isna())) & lefties, 'fd_wps_pa_vr'] = h_l_vr['fd_wps_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wps_pa_vl'].isna())) & righties, 'fd_wps_pa_vl'] = h_r_vl['fd_wps_pa_vl'].median()
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & lefties, 'fd_wpa_pa_vr'] = h_l_vr['fd_wpa_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & righties, 'fd_wpa_pa_vl'] = h_r_vl['fd_wpa_pa_vl'].median()
+            
+            
             
             
             try:
@@ -792,9 +801,13 @@ class Team(metaclass=IterTeam):
             if p_df['pitch_hand'].item() == 'L':
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['ppb_vl'].isna()), 'ppb_vl'] = p_q_l_vl['ppb_vl'].median()
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['ppb_vr'].isna()), 'ppb_vr'] = p_q_l_vr['ppb_vr'].median()
+                p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['k_b_vl'].isna()), 'k_b_vl'] = p_q_l_vl['k_b_vl'].median()
+                p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['k_b_vr'].isna()), 'k_b_vr'] = p_q_l_vr['k_b_vr'].median()
             else:
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['ppb_vl'].isna()), 'ppb_vl'] = p_q_r_vl['ppb_vl'].median()
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['ppb_vr'].isna()), 'ppb_vr'] = p_q_r_vr['ppb_vr'].median()
+                p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['k_b_vl'].isna()), 'k_b_vl'] = p_q_r_vl['k_b_vl'].median()
+                p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['k_b_vr'].isna()), 'k_b_vr'] = p_q_r_vr['k_b_vr'].median()
                 
             p_ppb = ((l_weight * p_df['ppb_vl'].max()) + (r_weight * p_df['ppb_vr'].max())) * 9 
             p_df['pitches_start'].fillna(p_q_sp['pitches_start'].median(), inplace = True)
@@ -812,15 +825,19 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['fd_wpa_b_vl'].isna()), 'fd_wpa_b_vl'] = p_q_r_vl['fd_wpa_b_vl'].median()
             
             key = 'fd_wps_pa_' + self.o_split
-            h_df.loc[lefties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vl'].max() * 1.1) + (h_df[key] *.9)) / 2)
-            h_df.loc[righties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vr'].max()  * 1.1) + (h_df[key] *.9)) / 2)
-            h_df.loc[lefties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vl'].max()  * 1.1) + (h_df[key] *.9)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[righties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vr'].max()  * 1.1) + (h_df[key] *.9)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[lefties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vl'].max() * 1) + (h_df[key] *1)) / 2)
+            h_df.loc[righties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2)
+            h_df.loc[lefties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vl'].max()  * 1) + (h_df[key] *1)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[righties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2) * h_df['exp_pa_sp']
             h_df.loc[lefties, 'sp_mu'] = p_df['fd_wpa_b_vl'].max()
             h_df.loc[righties, 'sp_mu'] = p_df['fd_wpa_b_vr'].max()
+            h_df['sp_split'] = h_df[key]
+            h_df['exp_ps_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
+            self.lu_talent_sp = h_df['sp_split'].sum()
             self.sp_mu = h_df['sp_mu'].sum()
             #points conceded
             key = 'fd_wpa_pa_' + self.o_split
+            k_key = 'k_pa_' + self.o_split
             
             if p_df['pitch_hand'].item() == 'L':
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['fd_wps_b_vr'].isna()), 'fd_wps_b_vr'] = p_q_l_vr['fd_wps_b_vr'].median()
@@ -829,9 +846,13 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['fd_wps_b_vr'].isna()), 'fd_wps_b_vr'] = p_q_r_vr['fd_wps_b_vr'].median()
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['fd_wps_b_vl'].isna()), 'fd_wps_b_vl'] = p_q_r_vl['fd_wps_b_vl'].median()
                 
-            h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1.1) + (h_df[key] * .9)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1.1) + (h_df[key] * .9)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
             h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
+            h_df['raw_exp_pc_sp'] = h_df[key]
+            h_df.loc[lefties, 'exp_k'] = (((p_df['k_b_vl'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[righties, 'exp_k'] = (((p_df['k_b_vr'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
+            h_df['exp_k_sp_raw'] = h_df[k_key]
             if p_df['pitch_hand'].item() == 'L':
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['ra-_b_vr'].isna()), 'ra-_b_vr'] = p_q_l_vr['ra-_b_vr'].median()
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['ra-_b_vl'].isna()), 'ra-_b_vl'] = p_q_l_vl['ra-_b_vl'].median()
@@ -874,7 +895,7 @@ class Team(metaclass=IterTeam):
                 h_df.loc[h_df['order'] == order, 'exp_pa_bp'] += 1
                 order += 1
                 exp_bf_bp -= 1
-            h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1.1) + (h_df['fd_wps_pa'] * .9)) / 2)
+            h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
             
             self.raw_points = h_df['exp_ps_raw'].sum()
@@ -903,6 +924,7 @@ class Team(metaclass=IterTeam):
             self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
             self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
             self.sp_mu = h_df['sp_mu'].sum()
+            self.lu_talent_sp = h_df['sp_split'].sum()
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
         return h_df
     def sp_df(self):
@@ -938,7 +960,12 @@ class Team(metaclass=IterTeam):
             print('Getting default SP stats.')
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
-        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
+        p_df['k_pred'] = h_df['exp_k'].sum()
+        p_df['k_pred_raw'] = h_df['exp_k_sp_raw'].sum()
+        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum()
+        p_df['mu'] = h_df['exp_pc_sp_raw'].sum()
+        p_df['raw_mu'] = h_df['raw_exp_pc_sp'].sum()
+        # p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
         p_df['venue_points'] = (p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)) - p_df['exp_ps_raw']
         p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
         p_df['ump_points'] = (p_df['exp_ps_raw'] * (-self.ump_boost % 2)) - p_df['exp_ps_raw']
@@ -1207,8 +1234,8 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        if len(self.next_venue_data.index) < 100:
-            return 1
+        # if len(self.next_venue_data.index) < 100:
+        #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
     @cached_property
     def temp_boost(self):
@@ -1356,4 +1383,5 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
 

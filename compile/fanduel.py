@@ -132,16 +132,17 @@ class FDSlate:
             hitters = sm_merge_single(hitters, merge, ratio=.75, suffixes=('', '_fd'))     
             hitters.drop_duplicates(subset='mlb_id', inplace=True)
             order_filter = (hitters['order'] <= self.max_batting_order)
+            hitters['points_salary'] = hitters['points'] - hitters['fd_salary']
             hitters_order = hitters[order_filter]
             team.salary = hitters_order['fd_salary'].sum() / len(hitters_order.index)
-            cols = ["raw_points", "venue_points", "temp_points", "points", "salary", "sp_mu"]
+            cols = ["raw_points", "venue_points", "temp_points", "points", "salary", "sp_mu", "raw_talent"]
             points_file = pickle_path(name=f"team_points_{tf.today}_{self.slate_number}", directory=settings.FD_DIR)
             points_path = settings.FD_DIR.joinpath(points_file)
             if points_path.exists():
                 p_df = pd.read_pickle(points_path)
             else:
                 p_df = pd.DataFrame(columns = cols)
-            p_df.loc[team.name, cols] = [team.raw_points, team.venue_points, team.temp_points, team.points, team.salary, team.sp_mu]
+            p_df.loc[team.name, cols] = [team.raw_points, team.venue_points, team.temp_points, team.points, team.salary, team.sp_mu, team.lu_talent_sp]
             with open(points_file, 'wb') as f:
                 pickle.dump(p_df, f)
             if path.exists():
@@ -173,6 +174,14 @@ class FDSlate:
                 df = pitcher
             with open(df_file, "wb") as f:
                  pickle.dump(df, f)
+        # df['p_z'] = (df['points'] - df['points'].mean()) / df['points'].std()
+        # df['rmu_z'] = (df['raw_mu'] - df['raw_mu'].mean()) / df['raw_mu'].std()
+        # df['mu_z'] = (df['mu'] - df['mu'].mean()) / df['mu'].std()
+        # df['kp_z'] = (df['k_pred'] - df['k_pred'].mean()) / df['k_pred'].std()
+        # df['rk_z'] = (df['k_pred_raw'] - df['k_pred_raw'].mean()) / df['k_pred_raw'].std()
+        # df['s_z'] = ((df['fd_salary'] - df['fd_salary'].mean()) / df['fd_salary'].std()) * -1
+        # df['pps_z'] = (df['pitches_start'] - df['pitches_start'].mean()) / df['pitches_start'].std()
+        # df['z'] = (df['p_z'] * 1) + (df['rmu_z'] * 1) + (df['mu_z'] * 1) + (df['kp_z'] * 1) + (df['rk_z'] * 1) + (df['s_z'] * 1) + (df['pps_z'] * 1)
             
         return df
     def h_df(self):
@@ -338,7 +347,7 @@ class FDSlate:
                       max_lu_stack = 50, 
                       max_sal = 35000, 
                       stack_sample = 5, 
-                      util_replace_filt = 0,
+                      util_replace_filt = 300,
                       variance = 25, 
                       non_stack_quantile = .80, 
                       high_salary_quantile = .80,
@@ -352,21 +361,23 @@ class FDSlate:
                       custom_secondary = None,
                       x_fallback = [],
                       stack_only = [],
-                      below_avg_count = 25,
-                      stack_expand_limit = 15,
+                      below_avg_count = 15,
+                      stack_expand_limit = 20,
                       of_count_adjust = 6,
                       limit_risk = [],
                       risk_limit = 25,
                       exempt=[],
                       stack_size = 4,
-                      secondary_stack_cut = 75,
+                      secondary_stack_cut = 50,
+                      no_surplus_cut = 100,
                       single_stack_surplus = 600,
-                      double_stack_surplus = 900,
-                      pitcher_surplus = 500,
+                      double_stack_surplus = 1200,
+                      pitcher_surplus = 1000,
                       no_secondary = [],
                       lock = [],
                       no_surplus_secondary_stacks=True,
-                      no_surplus_cut = 75):
+                      find_cheap_stacks = False,
+                      all_in=[]):
         max_order = self.max_batting_order
         # all hitters in slate
         h = self.h_df()
@@ -382,12 +393,13 @@ class FDSlate:
         h['ns_count'] = 0
         h_count_df = h.copy()
         #risk_limit should always be >= below_avg_count
-        h.loc[(h['exp_ps_sp_pa'] < h['exp_ps_sp_pa'].median()),'t_count'] = below_avg_count
+        h.loc[(h['sp_split'] < h['sp_split'].median()),'t_count'] = below_avg_count
         h.loc[(h['team'].isin(stack_only)), 't_count'] = 1000
         exempt_filt = (h['fd_id'].isin(exempt))
         h.loc[exempt_filt, 't_count'] = 0
         h.loc[(h['fd_position'].apply(lambda x: 'of' in x)), 't_count'] -= of_count_adjust
         h.loc[(h['team'].isin(limit_risk)), 't_count'] = risk_limit
+        h.loc[((h['fd_id'].isin(all_in)) | (h['team'].isin(all_in))), 't_count'] = -1000
         
         for k,v in custom_counts.items():
             h.loc[h['fd_id'] == k, 't_count'] = v
@@ -454,15 +466,15 @@ class FDSlate:
                 print('continuing')
                 print(stack)
                 print(p_info)
-                
-                
                 continue
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
             stack_df = h[h['team'] == stack]
             if remaining_stacks % 4 == 0:
-                stack_key = 'total_pitches'
-            elif remaining_stacks % 3 == 0:
+                stack_key = 'sp_split'
+            elif remaining_stacks % 3 == 0 and find_cheap_stacks:
+                stack_key = 'points_salary'
+            elif remaining_stacks % 3 == 0 and not find_cheap_stacks:
                 stack_key = 'fd_hr_weight'
             elif remaining_stacks % 2 == 0:
                 stack_key = 'points'
@@ -618,23 +630,27 @@ class FDSlate:
                 #filter out players with a salary greater than the average avg_sal above
                 sal_filt = (h['fd_salary'] <= avg_sal)
                 try:
-                    hitters = h[pos_filt & dupe_filt & count_filt & secondary_stack_filt]
+                    hitters = h[pos_filt & dupe_filt & count_filt & secondary_stack_filt & sal_filt]
                     hitter = hitters.loc[hitters[stack_key].idxmax()]
                 except (KeyError, ValueError):
                     try:
-                        hitters = h[pos_filt & stack_filt & dupe_filt & (fade_filt | value_filt) & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
-                        hitter = hitters.loc[hitters[non_stack_key].idxmax()]
+                        hitters = h[pos_filt & dupe_filt & count_filt & secondary_stack_filt]
+                        hitter = hitters.loc[hitters[stack_key].idxmax()]
                     except (KeyError, ValueError):
                         try:
-                            hitters = h[pos_filt & stack_filt & dupe_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                            hitters = h[pos_filt & stack_filt & dupe_filt & (fade_filt | value_filt) & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
                             hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                         except (KeyError, ValueError):
                             try:
-                                hitters = h[pos_filt & stack_filt & dupe_filt & opp_filt & count_filt & order_filt & plat_filt]
+                                hitters = h[pos_filt & stack_filt & dupe_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
                                 hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                             except (KeyError, ValueError):
-                                hitters = h[pos_filt & stack_filt & dupe_filt & sal_filt & count_filt & order_filt & plat_filt]
-                                hitter = hitters.loc[hitters[non_stack_key].idxmax()]
+                                try:
+                                    hitters = h[pos_filt & stack_filt & dupe_filt & opp_filt & count_filt & order_filt & plat_filt]
+                                    hitter = hitters.loc[hitters[non_stack_key].idxmax()]
+                                except (KeyError, ValueError):
+                                    hitters = h[pos_filt & stack_filt & dupe_filt & sal_filt & count_filt & order_filt & plat_filt]
+                                    hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                 
                 salary += hitter['fd_salary'].item()
                 rem_sal = max_sal - salary
@@ -960,6 +976,7 @@ class FDSlate:
             # print(index_track)
             print(salary)
             print(lus)
+            print(p_info[3])
             #keep track of players counts, regardless if they're eventually dropped.
             h_count_df.loc[(h_count_df['fd_id'].isin(lineup)), 't_count'] += 1
             p_count_df.loc[(p_count_df['fd_id']) == lineup[0], 't_count'] += 1

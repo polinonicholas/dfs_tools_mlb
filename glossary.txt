@@ -1,0 +1,11 @@
+sp_mu - the sum of fd_wpa for the starting pitcher, only account for handedness of the lineup.
+
+raw_talent - the sum of fd_wps for an offense, only accounting for pitcher handedness.
+
+mu (pitcher) - the sum of wpa for a lineup, adjusted using pps, exp_pa.
+
+raw_mu (pitcher) - the of wpa for a lineup, non-adjusted.
+
+k_pred - a prediction of Ks, adjusted using pps, exp_pa, weighted for pitcher and hitter k_stats.
+
+k_pred_raw - sum of a lineups k_pa, not adjusted.
