@@ -6,7 +6,8 @@ time_frames = Map({'today': datetime.date.today(),
                    'yesterday': datetime.date.today() - datetime.timedelta(days=1),
                    'thirty_days': datetime.date.today() - datetime.timedelta(days=30),
                    'one_year': datetime.date.today() - datetime.timedelta(days=365),
-                   'two_years': datetime.date.today() - datetime.timedelta(days=730)})
+                   'two_years': datetime.date.today() - datetime.timedelta(days=730),
+                   'fifteen_days': datetime.date.today() - datetime.timedelta(days=15)})
 
 def month_end(any_day):
     # this will never fail

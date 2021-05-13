@@ -93,7 +93,7 @@ def get_statcast_h(player_id, season):
             play_ids.add(play_id)
             plays.append(play)
     df = pd.DataFrame(plays)
-    df['date'] = df['date'] = pd.to_datetime(df['date'], infer_datetime_format=True)
+    df['date'] = pd.to_datetime(df['date'], infer_datetime_format=True)
     return df
 
 def get_statcast_p(player_id, season):

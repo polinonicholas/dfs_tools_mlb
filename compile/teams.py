@@ -33,19 +33,21 @@ from dfs_tools_mlb.dataframes.stat_splits import (h_splits, p_splits, h_q, h_q_v
 
 
 
-
 class IterTeam(type):
     def __iter__(cls):
         return iter(cls._all_teams)
     
 class Team(metaclass=IterTeam):
     _all_teams = []
-    def __init__(self, mlb_id, name='', custom_lineup=None, custom_sp=None):
+    def __init__(self, mlb_id, name='', custom_lineup=None, custom_sp=None, ppd=False,
+                 custom_pps=None):
         self._all_teams.append(self)
         self.id = mlb_id
         self.name = name
         self.custom_lineup = custom_lineup
         self.custom_sp = custom_sp
+        self.ppd = ppd
+        self.custom_pps = custom_pps
     @cached_property
     def depth(self):
         file = pickle_path(name=f"{self.name}_depth_{tf.today}", directory=settings.DEPTH_DIR)
@@ -439,7 +441,7 @@ class Team(metaclass=IterTeam):
             return statsapi.get('people', {'personIds': self.opp_instance.custom_sp})['people'][0]
         if self.next_game_pk:
             daily_info = Team.daily_info()
-            if self.opp_name not in daily_info['confirmed_sp']:
+            if self.opp_name not in daily_info['confirmed_sp'] and not self.ppd:
                 self.del_next_game()
             try:
                 sp_id = 'ID' + str(self.next_game['gameData']['probablePitchers'][self.opp_ha]['id'])
@@ -470,7 +472,7 @@ class Team(metaclass=IterTeam):
             return statsapi.get('people', {'personIds': self.custom_sp})['people'][0]
         if self.next_game_pk:
             daily_info = Team.daily_info()
-            if self.name not in daily_info['confirmed_sp']:
+            if self.name not in daily_info['confirmed_sp'] and not self.ppd:
                 self.del_next_game()
             try:
                 sp_id = 'ID' + str(self.next_game['gameData']['probablePitchers'][self.ha]['id'])
@@ -587,7 +589,7 @@ class Team(metaclass=IterTeam):
                 lineup =  Team.lineups()[self.name][self.opp_sp_hand]
                 if len(lineup) == 9:
                     return lineup
-            if self.name not in daily_info["confirmed_lu"]:
+            if self.name not in daily_info["confirmed_lu"] and not self.ppd:
                 self.del_next_game()
             lineup = self.next_game['liveData']['boxscore']['teams'][self.ha]['battingOrder']
             if len(lineup) == 9:
@@ -683,7 +685,7 @@ class Team(metaclass=IterTeam):
         file = pickle_path(name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR)
         path = settings.LINEUP_DIR.joinpath(file)
         daily_info = Team.daily_info()
-        if self.name not in daily_info["confirmed_lu"]:
+        if self.name not in daily_info["confirmed_lu"] and not self.ppd:
             self.del_props()
         if not path.exists() or self.name not in daily_info["confirmed_lu"]:
             lineup_ids = self.lineup
@@ -810,7 +812,10 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['k_b_vr'].isna()), 'k_b_vr'] = p_q_r_vr['k_b_vr'].median()
                 
             p_ppb = ((l_weight * p_df['ppb_vl'].max()) + (r_weight * p_df['ppb_vr'].max())) * 9 
+            #custom_pps here
             p_df['pitches_start'].fillna(p_q_sp['pitches_start'].median(), inplace = True)
+            if self.opp_instance.custom_pps:
+                p_df['pitches_start'] = self.opp_instance.custom_pps
             key = 'pitches_pa_' + self.o_split
             p_df['exp_x_lu'] = p_df['pitches_start'] / ((h_df[key].sum() + p_ppb) / 2)
             p_df['exp_bf'] = round((p_df['exp_x_lu'] * 9))
@@ -1383,5 +1388,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
 
