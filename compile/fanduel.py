@@ -341,47 +341,50 @@ class FDSlate:
             return "No lineups stored yet."
         
     
-    def build_lineups(self, lus = 150, 
+    def build_lineups(self, no_secondary = [],
+                      lus = 150, 
                       index_track = 0, 
+                      non_random_stack_start=0,
                       max_lu_total = 75,
+                      variance = 25, 
+                      below_avg_count = 15,
+                      risk_limit = 25,
+                      of_count_adjust = 6,
                       max_lu_stack = 50, 
                       max_sal = 35000, 
-                      stack_sample = 5, 
-                      util_replace_filt = 300,
-                      variance = 25, 
-                      non_stack_quantile = .85, 
-                      high_salary_quantile = .75,
-                      enforce_pitcher_surplus = True,
-                      enforce_hitter_surplus = True, 
-                      non_stack_max_order=5, 
-                      custom_counts={},
-                      fallback_stack_sample = 6,
-                      custom_stacks = None,
-                      custom_pitchers = None,
-                      custom_secondary = None,
-                      x_fallback = [],
-                      stack_only = [],
-                      below_avg_count = 15,
-                      stack_expand_limit = 20,
-                      of_count_adjust = 6,
-                      limit_risk = [],
-                      risk_limit = 25,
-                      exempt=[],
                       stack_size = 4,
-                      secondary_stack_cut = 50,
-                      no_surplus_cut = 100,
+                      stack_sample = 5, 
+                      stack_salary_pairing_cutoff=4,
+                      fallback_stack_sample = 6,
+                      stack_expand_limit = 20,
+                      non_stack_max_order=6, 
+                      util_replace_filt = 200,
+                      non_stack_quantile = .9, 
+                      high_salary_quantile = .9,
+                      secondary_stack_cut = 0,
+                      no_surplus_cut = 75,
                       single_stack_surplus = 600,
                       double_stack_surplus = 1200,
                       pitcher_surplus = 1000,
-                      no_secondary = [],
-                      lock = [],
                       no_surplus_secondary_stacks=True,
                       find_cheap_stacks = False,
-                      all_in=[],
-                      non_random_stack_start=0,
-                      stack_salary_pairing_cutoff=6,
                       always_pitcher_first=False,
-                      never_replace=[]):
+                      enforce_pitcher_surplus = True,
+                      enforce_hitter_surplus = True,
+                      filter_last_replaced=False,
+                      always_replace_pitcher_lock=False,
+                      exempt=[],
+                      all_in=[],
+                      lock = [],
+                      never_replace=[],
+                      x_fallback = [],
+                      stack_only = [],
+                      limit_risk = [],
+                      custom_counts={},
+                      remove_positions = None,
+                      custom_stacks = None,
+                      custom_pitchers = None,
+                      custom_secondary = None,):
         median_team_salary = self.points_df()['salary'].median()
         median_pitcher_salary = self.p_lu_df()['fd_salary'].median()
         max_order = self.max_batting_order
@@ -455,6 +458,13 @@ class FDSlate:
             'of.2': 7,
             'util': 8
             }
+        last_replaced = p_map.copy()
+        
+        if remove_positions:
+            for k,v in remove_positions.items():
+                position_id_filt = (h['fd_id'] == k)
+                h.loc[position_id_filt, 'fd_position'].apply(lambda x: x.remove(v))
+
         
         #lineups to build
         while lus > 0:
@@ -711,6 +721,7 @@ class FDSlate:
             
             for ps in needed_pos:
                 #filter out players already in lineup, lineup will change with each iteration
+                
                 dupe_filt = (~h['fd_id'].isin(lineup))
                 #filter out players not eligible for the current position being filled.
                 if 'of' in ps:
@@ -829,7 +840,7 @@ class FDSlate:
                 lineup[idx] = h_id
             #if remaining salary is greater than specified arg max_surplus
             if lus % 2 == 0 and not always_pitcher_first:
-                if not reset and (enforce_hitter_surplus or p_info[0] in lock) and rem_sal > max_surplus:
+                if not reset and (enforce_hitter_surplus or (p_info[0] in lock and always_replace_pitcher_lock)) and rem_sal > max_surplus:
                     random.shuffle(needed_pos)    
                     for ps in needed_pos:
                         if rem_sal < max_surplus:
@@ -837,11 +848,15 @@ class FDSlate:
                         idx = p_map[ps]
                         selected = h[h['fd_id'] == lineup[idx]]
                         s_sal = selected['fd_salary'].item()
-                        if s_sal < h['fd_salary'].quantile(high_salary_quantile) and ps not in never_replace:
+                        if s_sal < h['fd_salary'].quantile(high_salary_quantile) and ps not in never_replace and lineup[idx] not in all_in:
                             #filter out players already in lineup, lineup will change with each iteration
                             dupe_filt = (~h['fd_id'].isin(lineup))
                             #filter out players going against current lineup's pitcher
                             opp_filt = (h['opp'] != p_info[3])
+                            if filter_last_replaced:
+                                last_replaced_filt = (h['fd_id'] != last_replaced[ps])
+                            else:
+                                last_replaced_filt = (h['fd_id'] != 1)
                             #filter out players not eligible for the current position being filled.
                             if 'of' in ps:
                                 pos_filt = (h['fd_position'].apply(lambda x: 'of' in x))
@@ -850,8 +865,14 @@ class FDSlate:
                             else:
                                 pos_filt = (h['fd_position'].apply(lambda x: ps in x))
                             #filter out players with a salary less than high_salary_quantile arg
+                            
+                            
+                            
+                            
                             sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
-                            hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                            hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt & secondary_stack_filt]
+                            if len(hitters.index) == 0:
+                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt]
                             if len(hitters.index) > 0:
                                 hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                                 n_sal = hitter['fd_salary'].item()
@@ -861,7 +882,9 @@ class FDSlate:
                                 lineup[idx] = hitter['fd_id']
                             else:
                                 sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
-                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt & secondary_stack_filt]
+                                if len(hitters.index) == 0:
+                                    hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt]
                                 if len(hitters.index) > 0:
                                     hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                                     n_sal = hitter['fd_salary'].item()
@@ -869,6 +892,8 @@ class FDSlate:
                                     salary += n_sal
                                     rem_sal = max_sal - salary
                                     lineup[idx] = hitter['fd_id']
+                            if len(hitters.index) > 0:
+                                last_replaced[ps] = hitter['fd_id']
                     
                 if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus and p_info[0] not in lock:
                     #filter out pitchers who would put the salary over the max_sal if inserted
@@ -922,7 +947,7 @@ class FDSlate:
                         salary += np_sal
                         rem_sal = max_sal - salary
                         lineup[0] = np_id
-                if not reset and (enforce_hitter_surplus or p_info[0] in lock) and rem_sal > max_surplus:
+                if not reset and (enforce_hitter_surplus or (p_info[0] in lock and always_replace_pitcher_lock)) and rem_sal > max_surplus:
                     random.shuffle(needed_pos)    
                     for ps in needed_pos:
                         if rem_sal < max_surplus:
@@ -930,11 +955,15 @@ class FDSlate:
                         idx = p_map[ps]
                         selected = h[h['fd_id'] == lineup[idx]]
                         s_sal = selected['fd_salary'].item()
-                        if s_sal < h['fd_salary'].quantile(high_salary_quantile) and ps not in never_replace:
+                        if s_sal < h['fd_salary'].quantile(high_salary_quantile) and ps not in never_replace and lineup[idx] not in all_in:
                             #filter out players already in lineup, lineup will change with each iteration
                             dupe_filt = (~h['fd_id'].isin(lineup))
                             #filter out players going against current lineup's pitcher
                             opp_filt = (h['opp'] != p_info[3])
+                            if filter_last_replaced:
+                                last_replaced_filt = (h['fd_id'] != last_replaced[ps])
+                            else:
+                                last_replaced_filt = (h['fd_id'] != 1)
                             #filter out players not eligible for the current position being filled.
                             if 'of' in ps:
                                 pos_filt = (h['fd_position'].apply(lambda x: 'of' in x))
@@ -944,7 +973,9 @@ class FDSlate:
                                 pos_filt = (h['fd_position'].apply(lambda x: ps in x))
                             #filter out players with a salary less than high_salary_quantile arg
                             sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
-                            hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                            hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt & secondary_stack_filt]
+                            if len(hitters.index) == 0:
+                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt]
                             if len(hitters.index) > 0:
                                 hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                                 n_sal = hitter['fd_salary'].item()
@@ -954,7 +985,9 @@ class FDSlate:
                                 lineup[idx] = hitter['fd_id']
                             else:
                                 sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
-                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt]
+                                hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt & secondary_stack_filt]
+                                if len(hitters.index) == 0:
+                                    hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt]
                                 if len(hitters.index) > 0:
                                     hitter = hitters.loc[hitters[non_stack_key].idxmax()]
                                     n_sal = hitter['fd_salary'].item()
@@ -962,6 +995,9 @@ class FDSlate:
                                     salary += n_sal
                                     rem_sal = max_sal - salary
                                     lineup[idx] = hitter['fd_id']
+                            if len(hitters.index) > 0:
+                                last_replaced[ps] = hitter['fd_id']
+                                
                 
                 
             #if there aren't enough teams being used, replace the utility player with a team not in use.    
@@ -1095,5 +1131,6 @@ class FDSlate:
                 pickle.dump(h_count_df, f)
         with open(p_count_file, "wb") as f:
                 pickle.dump(p_count_df, f)
+        print(f"High salary quantile is: {h['fd_salary'].quantile(high_salary_quantile)}")
         
         return stack_track
