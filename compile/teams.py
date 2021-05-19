@@ -739,6 +739,7 @@ class Team(metaclass=IterTeam):
             lefties = (h_df['bat_side'] == 'L')
             righties = (h_df['bat_side'] == 'R')
             # adjustments for pitchers in lineup
+            
             h_df.loc[((h_df['pa'] < 50) | (h_df['pitches_pa'].isna())) & (h_df['position'].isin(mac.players.p)), 'pitches_pa'] = hp_q['pitches_pa'].median()
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'pitches_pa_vr'] = hp_q['pitches_pa'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'pitches_pa_vl'] = hp_q['pitches_pa'].median()
@@ -753,25 +754,25 @@ class Team(metaclass=IterTeam):
             h_df.loc[(h_df['pa'] < 50) | (h_df['fd_wpa_pa'].isna()), 'fd_wpa_pa'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vr'] = hp_q['k_pa'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vl'] = hp_q['k_pa'].median()
-
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & righties, 'pitches_pa_vr'] = h_r_vr['pitches_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & lefties, 'pitches_pa_vl'] = h_l_vl['pitches_pa_vl'].median()
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wps_pa_vr'].isna())) & righties, 'fd_wps_pa_vr'] = h_r_vr['fd_wps_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wps_pa_vl'].isna())) & lefties, 'fd_wps_pa_vl'] = h_l_vl['fd_wps_pa_vl'].median()
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & righties, 'fd_wpa_pa_vr'] = h_r_vr['fd_wpa_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & lefties, 'fd_wpa_pa_vl'] = h_l_vl['fd_wpa_pa_vl'].median()
+            not_pitcher_filt = (~h_df['position'].isin(mac.players.p))
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & righties & not_pitcher_filt, 'pitches_pa_vr'] = h_r_vr['pitches_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & lefties & not_pitcher_filt, 'pitches_pa_vl'] = h_l_vl['pitches_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wps_pa_vr'].isna())) & righties & not_pitcher_filt, 'fd_wps_pa_vr'] = h_r_vr['fd_wps_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wps_pa_vl'].isna())) & lefties & not_pitcher_filt, 'fd_wps_pa_vl'] = h_l_vl['fd_wps_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & righties & not_pitcher_filt, 'fd_wpa_pa_vr'] = h_r_vr['fd_wpa_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & lefties & not_pitcher_filt, 'fd_wpa_pa_vl'] = h_l_vl['fd_wpa_pa_vl'].median()
             
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & righties, 'k_pa_vr'] = h_r_vr['k_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & lefties, 'k_pa_vl'] = h_l_vl['k_pa_vl'].median()
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & lefties, 'k_pa_vr'] = h_l_vr['k_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & righties, 'k_pa_vl'] = h_r_vl['k_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & righties & not_pitcher_filt, 'k_pa_vr'] = h_r_vr['k_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & lefties & not_pitcher_filt, 'k_pa_vl'] = h_l_vl['k_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & lefties & not_pitcher_filt, 'k_pa_vr'] = h_l_vr['k_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & righties & not_pitcher_filt, 'k_pa_vl'] = h_r_vl['k_pa_vl'].median()
             
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & lefties, 'pitches_pa_vr'] = h_l_vr['pitches_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & righties, 'pitches_pa_vl'] = h_r_vl['pitches_pa_vl'].median()
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wps_pa_vr'].isna())) & lefties, 'fd_wps_pa_vr'] = h_l_vr['fd_wps_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wps_pa_vl'].isna())) & righties, 'fd_wps_pa_vl'] = h_r_vl['fd_wps_pa_vl'].median()
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & lefties, 'fd_wpa_pa_vr'] = h_l_vr['fd_wpa_pa_vr'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & righties, 'fd_wpa_pa_vl'] = h_r_vl['fd_wpa_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & lefties & not_pitcher_filt, 'pitches_pa_vr'] = h_l_vr['pitches_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & righties & not_pitcher_filt, 'pitches_pa_vl'] = h_r_vl['pitches_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wps_pa_vr'].isna())) & lefties & not_pitcher_filt, 'fd_wps_pa_vr'] = h_l_vr['fd_wps_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wps_pa_vl'].isna())) & righties & not_pitcher_filt, 'fd_wps_pa_vl'] = h_r_vl['fd_wps_pa_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & lefties & not_pitcher_filt, 'fd_wpa_pa_vr'] = h_l_vr['fd_wpa_pa_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & righties & not_pitcher_filt, 'fd_wpa_pa_vl'] = h_r_vl['fd_wpa_pa_vl'].median()
             
             
             
@@ -818,6 +819,7 @@ class Team(metaclass=IterTeam):
                 p_df['pitches_start'] = self.opp_instance.custom_pps
             key = 'pitches_pa_' + self.o_split
             p_df['exp_x_lu'] = p_df['pitches_start'] / ((h_df[key].sum() + p_ppb) / 2)
+            print(p_df['exp_x_lu'])
             p_df['exp_bf'] = round((p_df['exp_x_lu'] * 9))
             sp_rollover = floor((p_df['exp_x_lu'] % 1) * 9)
             h_df.loc[h_df['order'] <= sp_rollover, 'exp_pa_sp'] = ceil(p_df['exp_x_lu'])
@@ -1388,3 +1390,9 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
+
+# astros = [514888, 488726, 608324, 670541, 493329, 621043, 663656, 664702, 455117]
+# indians = [514917, 656669, 608070, 614177, 592696, 623912, 647304, 642708, 595978]
+# angels = [621493, 660271, 545361, 543685, 665120, 457708, 578428, 435559, 664058]
+# red_sox = [656308, 657077, 502110, 593428, 646240, 543877, 503556, 592669, 666915]

@@ -19,12 +19,12 @@ pd.set_option('display.max_columns', None)
 #                  pitcher_threshold = 75,
 #                  heavy_weight_stack=False, 
 #                  heavy_weight_p=False, 
-#                  max_batting_order=7):
+#                  salary_batting_order=5):
         
 s=FDSlate(
           p_fades = [],
           h_fades = [],
-          max_batting_order=7,
+          salary_batting_order=5,
           )
 
 s.active_teams
@@ -111,7 +111,7 @@ lineups = s.build_lineups(
                       stack_size = 4,
                       stack_sample = 5, 
                       
-                      stack_salary_pairing_cutoff=3,
+                      stack_salary_pairing_cutoff=2,
                       stack_max_pair = 6,
                       
                       fallback_stack_sample = 6,
@@ -122,10 +122,10 @@ lineups = s.build_lineups(
                       high_salary_quantile = .9,
                       
                       secondary_stack_cut = 0,
-                      no_surplus_cut = 75,
-                      single_stack_surplus = 600,
-                      double_stack_surplus = 1200,
-                      pitcher_surplus = 1000,
+                      no_surplus_cut = 151,
+                      single_stack_surplus = 500,
+                      double_stack_surplus = 500,
+                      pitcher_surplus = 500,
                       
                       median_pitcher_salary = None,
                       low_pitcher_salary = None,
@@ -137,18 +137,22 @@ lineups = s.build_lineups(
                       max_stack_salary = None,
                       
                       no_surplus_secondary_stacks=True,
+                      
                       find_cheap_stacks = False,
                       always_pitcher_first=False,
+                      always_replace_pitcher_lock=False,
+                      
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = True,
                       filter_last_replaced=True,
-                      always_replace_pitcher_lock=False,
+                      
                       p_sal_stack_filter = True,
                       
                       exempt=[],
                       all_in=[],
                       lock = [],
                       no_combos = [],
+                      always_replace_first = [],
                       never_replace=[],
                       x_fallback = [],
                       stack_only = [],
@@ -199,7 +203,7 @@ all_stacks['mu_z'] = (all_stacks['sp_mu'] - all_stacks['sp_mu'].mean()) / all_st
 all_stacks['t_z'] = (all_stacks['raw_talent'] - all_stacks['raw_talent'].mean()) / all_stacks['raw_talent'].std()
 all_stacks['z'] = (all_stacks['p_z'] * 1) + (all_stacks['s_z'] * 1) + (all_stacks['mu_z'] * 1) + (all_stacks['t_z'] * 1) 
 all_stacks['mz'] = (all_stacks['p_z'] * 1) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 1) + (all_stacks['t_z'] * 1) 
-all_pitchers = s.p_df()[['name', 'points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw']].sort_values(by='points', ascending=False)
+all_pitchers = s.p_df()[['name', 'points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 'fd_id', 'name']].sort_values(by='points', ascending=False)
 all_pitchers['p_z'] = (all_pitchers['points'] - all_pitchers['points'].mean()) / all_pitchers['points'].std()
 all_pitchers['rmu_z'] = (all_pitchers['raw_mu'] - all_pitchers['raw_mu'].mean()) / all_pitchers['raw_mu'].std()
 all_pitchers['mu_z'] = (all_pitchers['mu'] - all_pitchers['mu'].mean()) / all_pitchers['mu'].std()
