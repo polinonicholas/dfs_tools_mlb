@@ -977,6 +977,9 @@ class Team(metaclass=IterTeam):
         p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
         p_df['ump_points'] = (p_df['exp_ps_raw'] * (-self.ump_boost % 2)) - p_df['exp_ps_raw']
         p_df['points'] = p_df['exp_ps_raw'] + p_df['venue_points'] + p_df['temp_points'] + p_df['ump_points']
+        p_df['ump_avg'] = self.ump_avg
+        p_df['venue_temp'] = self.venue_temp
+        p_df['venue_avg'] = self.venue_avg
         
         if self.name in daily_info['confirmed_sp']:
             with open(file, "wb") as f:
@@ -1241,9 +1244,28 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
+        if self.name == 'rangers' or self.opp_name == 'rangers':
+            return 1.1
         # if len(self.next_venue_data.index) < 100:
         #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
+    
+    @cached_property
+    def venue_avg(self):
+        if self.next_venue == 5325:
+            return game_data['fd_points'].mean() * 1.1
+        if (self.wind_direction in mac.weather.wind_out or self.wind_direction in mac.weather.wind_in) and not self.roof_closed:
+            wind_in = self.next_venue_data[self.next_venue_data['wind_direction'].isin(mac.weather.wind_in)]
+            wind_out = self.next_venue_data[self.next_venue_data['wind_direction'].isin(mac.weather.wind_out)]
+            if len(wind_in.index) >= 50 and len(wind_out.index) >= 50:
+                if ((wind_out['fd_points'].mean() - wind_in['fd_points'].mean()) / game_data['fd_points'].mean()) > 0:
+                    if self.wind_speed >= (game_data['wind_speed'].median() - 1):
+                        if self.wind_direction in mac.weather.wind_out:
+                            return wind_out['fd_points'].mean()
+                        if self.wind_direction in mac.weather.wind_in:
+                            return wind_in['fd_points'].mean()
+        return self.next_venue_data['fd_points'].mean()
+        
     @cached_property
     def temp_boost(self):
         if self.venue_temp:
@@ -1266,6 +1288,12 @@ class Team(metaclass=IterTeam):
         if len(self.projected_ump_data.index) >= 100:
             return self.projected_ump_data['fd_points'].mean() / game_data['fd_points'].mean()
         return 1
+    @cached_property
+    def ump_avg(self):
+        if len(self.projected_ump_data.index) >= 100:
+            return self.projected_ump_data['fd_points'].mean()
+        return game_data['fd_points'].mean()
+    
 
     @cached_property
     def opp_bullpen(self):
@@ -1391,8 +1419,5 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
-
-# astros = [514888, 488726, 608324, 670541, 493329, 621043, 663656, 664702, 455117]
-# indians = [514917, 656669, 608070, 614177, 592696, 623912, 647304, 642708, 595978]
-# angels = [621493, 660271, 545361, 543685, 665120, 457708, 578428, 435559, 664058]
-# red_sox = [656308, 657077, 502110, 593428, 646240, 543877, 503556, 592669, 666915]
+# athletics.clear_all_team_cache()
+# , custom_lineup = [643565, 573262, 457763, 474832, 543105, 446334, 543063, 456781, 622072]
