@@ -18,7 +18,7 @@ class FDSlate:
                  slate_number = 1, 
                  lineups = 150,
                  p_fades = [],
-                 h_fades=[],
+                 h_fades=['twins'],
                  no_stack=[],
                  stack_points_weight = 2, 
                  stack_threshold = 50, 
@@ -452,7 +452,7 @@ class FDSlate:
             secondary = self.stacks_df()['stacks'].to_dict()
         else:
             secondary = custom_secondary
-        print(secondary)
+       
             
         stack_list = list(s)
        
@@ -524,7 +524,7 @@ class FDSlate:
             else:
                 information['stack_combos'] = len(list(combinations(list(custom_stacks_info), 2)))
             information['pitcher_combos'] = len(list(combinations(list(s), 2))) * len(list(pd)) 
-            print(p[p.index.isin(pd.keys())])                           
+            print(p.loc[p.index.isin(pd.keys()), 'name'])                           
             return information
 
        

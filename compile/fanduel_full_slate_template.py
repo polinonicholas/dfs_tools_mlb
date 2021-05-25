@@ -110,6 +110,9 @@ lineups = s.build_lineups(
                       low_stack_salary = None,
                       high_stack_salary = None,
                       max_stack_salary = None,
+                      stack_salary_pairing_cutoff=0,
+                      stack_max_pair = 5,
+                      
                       lus = 150, 
                       index_track = 0, 
                       non_random_stack_start=0,
@@ -122,21 +125,25 @@ lineups = s.build_lineups(
                       of_count_adjust = 0,
                       max_lu_stack = 50, 
                       
-                      max_sal = 35000, 
+                      
                       stack_size = 4,
                       stack_sample = 5, 
-                      stack_salary_pairing_cutoff=0,
-                      stack_max_pair = 5,
+                      
+                      
                       fallback_stack_sample = 6,
                       stack_expand_limit = 20,
                       
                       max_order=7,
                       non_stack_max_order=6, 
-                      util_replace_filt = 200,
+                     
                       non_stack_quantile = .9, 
                       high_salary_quantile = .9,
+                      
                       secondary_stack_cut = 0,
                       no_surplus_cut = 0,
+                      
+                      max_sal = 35000,
+                      util_replace_filt = 200,
                       single_stack_surplus = 400,
                       double_stack_surplus = 400,
                       pitcher_surplus = 1000,
@@ -156,11 +163,14 @@ lineups = s.build_lineups(
                       exempt=[],
                       all_in=[],
                       lock = [],
+                      #pitcher
                       no_combos = [],
+                      #position
                       never_replace=[],
                       x_fallback = [],
                       stack_only = [],
                       limit_risk = [],
+                      #stacks/h
                       no_combine = [],
                       always_replace_first = [],
                       custom_counts={},
@@ -207,26 +217,29 @@ all_stacks['u_z'] = (all_stacks['ump_avg'] - all_stacks['ump_avg'].mean()) / all
 all_stacks['v_z'] = (all_stacks['venue_avg'] - all_stacks['venue_avg'].mean()) / all_stacks['venue_avg'].std()
 all_stacks['vt_z'] = (all_stacks['venue_temp'] - all_stacks['venue_temp'].mean()) / all_stacks['venue_temp'].std()
 
-all_stacks['p_z'] = (all_stacks['points'] - all_stacks['points'].mean()) / all_stacks['points'].std()
+all_stacks['p_z'] = (all_stacks['raw_points'] - all_stacks['raw_points'].mean()) / all_stacks['raw_points'].std()
 all_stacks['s_z'] = ((all_stacks['salary'] - all_stacks['salary'].mean()) / all_stacks['salary'].std()) * -1
 all_stacks['mu_z'] = (all_stacks['sp_mu'] - all_stacks['sp_mu'].mean()) / all_stacks['sp_mu'].std()
 all_stacks['t_z'] = (all_stacks['raw_talent'] - all_stacks['raw_talent'].mean()) / all_stacks['raw_talent'].std()
-all_stacks['z'] = ((all_stacks['p_z'] * 1) + (all_stacks['s_z'] * 1) + (all_stacks['mu_z'] * 1) + (all_stacks['t_z'] * 1) + (all_stacks['vt_z'] * 1) + (all_stacks['u_z'] * 1) + (all_stacks['v_z'] * 1)) / 7
-all_stacks['mz'] = ((all_stacks['p_z'] * 1) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 1) + (all_stacks['t_z'] * 1) + (all_stacks['vt_z'] * 1) + (all_stacks['u_z'] * 1) + (all_stacks['v_z'] * 1)) / 6
+all_stacks['z'] = ((all_stacks['p_z'] * 1) + (all_stacks['s_z'] * 1) + (all_stacks['mu_z'] * 1) + (all_stacks['t_z'] * 1) + (all_stacks['vt_z'] * 1) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 1)) / 6
+all_stacks['mz'] = ((all_stacks['p_z'] * 1) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 1) + (all_stacks['t_z'] * 1) + (all_stacks['vt_z'] * 1) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 1)) / 5
 all_pitchers = s.p_df()[['name', 'points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
-                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp']].sort_values(by='points', ascending=False)
+                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw']].sort_values(by='points', ascending=False)
+#################################
+# vt_filt = (all_pitchers['venue_temp'] == '')
+# all_pitchers.loc[vt_filt, 'venue_temp'] = 62
 all_pitchers['vt_z'] = ((all_pitchers['venue_temp'] - all_pitchers['venue_temp'].mean()) / all_pitchers['venue_temp'].std()) * -1
 all_pitchers['v_z'] = ((all_pitchers['venue_avg'] - all_pitchers['venue_avg'].mean()) / all_pitchers['venue_avg'].std()) * -1
 all_pitchers['u_z'] = ((all_pitchers['ump_avg'] - all_pitchers['ump_avg'].mean()) / all_pitchers['ump_avg'].std()) * -1
-all_pitchers['p_z'] = (all_pitchers['points'] - all_pitchers['points'].mean()) / all_pitchers['points'].std()
+all_pitchers['p_z'] = (all_pitchers['exp_ps_raw'] - all_pitchers['exp_ps_raw'].mean()) / all_pitchers['exp_ps_raw'].std()
 all_pitchers['rmu_z'] = (all_pitchers['raw_mu'] - all_pitchers['raw_mu'].mean()) / all_pitchers['raw_mu'].std()
 all_pitchers['mu_z'] = (all_pitchers['mu'] - all_pitchers['mu'].mean()) / all_pitchers['mu'].std()
 all_pitchers['kp_z'] = (all_pitchers['k_pred'] - all_pitchers['k_pred'].mean()) / all_pitchers['k_pred'].std()
 all_pitchers['rk_z'] = (all_pitchers['k_pred_raw'] - all_pitchers['k_pred_raw'].mean()) / all_pitchers['k_pred_raw'].std()
 all_pitchers['s_z'] = ((all_pitchers['fd_salary'] - all_pitchers['fd_salary'].mean()) / all_pitchers['fd_salary'].std()) * -1
 all_pitchers['pps_z'] = (all_pitchers['pitches_start'] - all_pitchers['pitches_start'].mean()) / all_pitchers['pitches_start'].std()
-all_pitchers['z'] = ((all_pitchers['p_z'] * 1) + (all_pitchers['rmu_z'] * 1) + (all_pitchers['mu_z'] * 1) + (all_pitchers['kp_z'] * 1) + (all_pitchers['rk_z'] * 1) + (all_pitchers['s_z'] * 1) + (all_pitchers['pps_z'] * 1) + (all_pitchers['vt_z'] * 1) + (all_pitchers['v_z'] * 1) + (all_pitchers['u_z'] * 1)) / 10
-all_pitchers['mz'] = ((all_pitchers['p_z'] * 1) + (all_pitchers['rmu_z'] * 1) + (all_pitchers['mu_z'] * 1) + (all_pitchers['kp_z'] * 1) + (all_pitchers['rk_z'] * 1) + (all_pitchers['s_z'] * 0) + (all_pitchers['pps_z'] * 1) + (all_pitchers['vt_z'] * 1) + (all_pitchers['v_z'] * 1) + (all_pitchers['u_z'] * 1)) / 9
+all_pitchers['z'] = ((all_pitchers['p_z'] * 1) + (all_pitchers['rmu_z'] * 0) + (all_pitchers['mu_z'] * 1) + (all_pitchers['kp_z'] * 1) + (all_pitchers['rk_z'] * 0) + (all_pitchers['s_z'] * 1) + (all_pitchers['pps_z'] * 1) + (all_pitchers['vt_z'] * 1) + (all_pitchers['v_z'] * 1) + (all_pitchers['u_z'] * 0)) / 7
+all_pitchers['mz'] = ((all_pitchers['p_z'] * 1) + (all_pitchers['rmu_z'] * 0) + (all_pitchers['mu_z'] * 1) + (all_pitchers['kp_z'] * 1) + (all_pitchers['rk_z'] * 0) + (all_pitchers['s_z'] * 0) + (all_pitchers['pps_z'] * 1) + (all_pitchers['vt_z'] * 1) + (all_pitchers['v_z'] * 1) + (all_pitchers['u_z'] * 0)) / 6
 
 pitcher_z =  all_pitchers[['name',
                            'p_z',
@@ -252,10 +265,10 @@ stack_z = all_stacks[['p_z',
                       'mz']].sort_values(by='mz', ascending=False)
 
 pitcher_points = all_pitchers[['name','points']].set_index('name')
-pitcher_mz = pitcher_z[['mz', 'z']]
+pitcher_mz = pitcher_z[['mz', 'z', 'pps_z', 'u_z']]
 pitcher_adj_z = pitcher_z[['z', 'mz']].sort_values(by='z', ascending=False)
-stack_mz = stack_z[['mz', 'z']].sort_values(by='mz', ascending=False)
-stack_adj_z = stack_z[['z', 'mz']].sort_values(by='z', ascending=False)
+stack_mz = stack_z[['mz', 'z', 'uz']].sort_values(by='mz', ascending=False)
+stack_adj_z = stack_z[['z', 'mz', 'uz']].sort_values(by='z', ascending=False)
 
 #get pitcher statcast info for slate
 pitcher_statcast_file = pickle_path(name=f"pitcher_statcast_{tf.today}_{s.slate_number}", directory=settings.FD_DIR)

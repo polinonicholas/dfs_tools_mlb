@@ -752,8 +752,8 @@ class Team(metaclass=IterTeam):
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'fd_wpa_pa_vr'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'fd_wpa_pa_vl'] = hp_q['fd_wpa_pa'].median()
             h_df.loc[(h_df['pa'] < 50) | (h_df['fd_wpa_pa'].isna()), 'fd_wpa_pa'] = hp_q['fd_wpa_pa'].median()
-            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vr'] = hp_q['k_pa'].median()
-            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vl'] = hp_q['k_pa'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['k_pa_vr'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vr'] = hp_q['k_pa'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['k_pa_vl'].isna())) & (h_df['position'].isin(mac.players.p)), 'k_pa_vl'] = hp_q['k_pa'].median()
             not_pitcher_filt = (~h_df['position'].isin(mac.players.p))
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['pitches_pa_vr'].isna())) & righties & not_pitcher_filt, 'pitches_pa_vr'] = h_r_vr['pitches_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['pitches_pa_vl'].isna())) & lefties & not_pitcher_filt, 'pitches_pa_vl'] = h_l_vl['pitches_pa_vl'].median()
@@ -1418,6 +1418,11 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
+
+# twins.lineup
+# test = p_splits[p_splits['name'] == 'Michael Wacha']
+
+# test[['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
 
 # athletics.clear_all_team_cache()
 # , custom_lineup = [643565, 573262, 457763, 474832, 543105, 446334, 543063, 456781, 622072]
