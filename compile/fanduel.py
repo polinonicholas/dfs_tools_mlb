@@ -164,6 +164,7 @@ class FDSlate:
         path = settings.FD_DIR.joinpath(df_file)
         for team in self.team_instances:
             pitcher = team.sp_df()
+            pitcher['fav'] = team.points - team.opp_instance.points
             merge = self.player_info_df[(self.player_info_df['team'] == team.name) & (self.player_info_df['is_p'] == True)]
             try:
                 pitcher = sm_merge_single(pitcher, merge, ratio=.75, suffixes=('', '_fd')) 
@@ -213,6 +214,11 @@ class FDSlate:
             self.get_hitters()
         df = pd.read_pickle(path).apply(pd.to_numeric)
         return df
+    
+    @cached_property
+    def util_df(self):
+        df = self.h_df()
+        return df[df['fd_r_position'].apply(lambda x: 'util' in x)]
     @cached_property
     def first_df(self):
         df = self.h_df()
@@ -404,7 +410,9 @@ class FDSlate:
                       custom_stacks = None,
                       custom_pitchers = None,
                       custom_secondary = None,
-                      custom_stacks_info = None):
+                      custom_stacks_info = None,
+                      fill_high_salary_first = False,
+                      select_max_pitcher = True):
         
         # all hitters in slate
         h = self.h_df()
@@ -422,6 +430,7 @@ class FDSlate:
         #risk_limit should always be >= below_avg_count
         h.loc[(h['sp_split'] < h['sp_split'].median()),'t_count'] = below_avg_count
         h.loc[(h['team'].isin(stack_only)), 't_count'] = 1000
+        h.loc[(h['fd_id'].isin(stack_only)), 't_count'] = 1000
         exempt_filt = (h['fd_id'].isin(exempt))
         h.loc[exempt_filt, 't_count'] = 0
         h.loc[h_order_filt, 't_count'] = below_order_count
@@ -523,8 +532,10 @@ class FDSlate:
                 
             else:
                 information['stack_combos'] = len(list(combinations(list(custom_stacks_info), 2)))
-            information['pitcher_combos'] = len(list(combinations(list(s), 2))) * len(list(pd)) 
-            print(p.loc[p.index.isin(pd.keys()), 'name'])                           
+            information['pitcher_combos'] = len(list(combinations(list(s), 2))) * len(list(pd))
+            print(h.loc[h['exp_ps_sp_pa'].nlargest(60).index, ['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw','fd_salary', 'order']])
+            print(p.loc[p.index.isin(pd.keys()), 'name'])
+            # print(h.columns.tolist())                        
             return information
 
        
@@ -541,7 +552,10 @@ class FDSlate:
             # c_idx = h[total_filt | count_filt].index
             # h.drop(index=c_idx,inplace=True)
             #pitchers expected lineups will be reduced by 1 for each successful lineup insertion
-            pitchers = {k:v for k,v in pd.items() if v > 0}
+            if select_max_pitcher:
+                pitchers = {k:v for k,v in pd.items() if v == max(pd.values())}
+            else:
+                pitchers = {k:v for k,v in pd.items() if v > 0}
             #randomly select a pitcher in pool, keys are == p.index
             pi = random.choice(list(pitchers.keys()))
             #lookup required pitcher info. by index (pi)
@@ -580,14 +594,14 @@ class FDSlate:
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
             stack_df = h[h['team'] == stack]
-            if remaining_stacks % 4 == 0:
-                stack_key = 'sp_split'
+            # if remaining_stacks % 3 == 0:
+            #     stack_key = 'order'
             # elif remaining_stacks % 3 == 0 and find_cheap_stacks:
             #     stack_key = 'points_salary'
-            elif remaining_stacks % 3 == 0:
-                stack_key = 'fd_hr_weight'
-            elif remaining_stacks % 2 == 0:
-                stack_key = 'points'
+            # elif remaining_stacks % 3 == 0:
+            #     stack_key = 'fd_hr_weight'
+            if remaining_stacks % 2 == 0:
+                stack_key = 'order'
             else:
                 stack_key = 'exp_ps_sp_pa'
             if lus % 2 == 0:
@@ -641,6 +655,9 @@ class FDSlate:
                     #if already 2 outfielders and player is eligible outfielder
                     elif 'of' in x and pl2.count('of.1') == 1 and 'of.2' not in pl2:
                         pl2.append('of.2')
+                    elif 'util' not in pl2:
+                         pl2.append('util')
+                        
             #if couldn't create a 4-man stack, create a 3-man stack        
             if a > 10:
                 a = 0
@@ -669,6 +686,9 @@ class FDSlate:
                             pl2.append('of.2')
                         elif 'of' in x and pl2.count('of') == 1 and 'of.1' not in pl2:
                             pl2.append('of.1')
+                        elif 'util' not in pl2:
+                            pl2.append('util')
+                            
             
             #put required information for stack in lists of lists   
             stack_info = h.loc[h['fd_id'].isin(samp), ['fd_salary', 'fd_id']].values
@@ -827,21 +847,22 @@ class FDSlate:
                                                 and stack_track[stack]['secondary'].get(k, 0) < stack_salary_pairing_cutoff
                                                 and stack_track[k]['salary'] >= median_team_salary }
                             
-                    # if len(list(secondary_stacks)) < 1:
-                    #     secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
-                    #                 and k != p_info[2] 
-                    #                 and k != stack 
-                    #                 and k not in stack_track[stack]['secondary']}
-                    # if len(list(secondary_stacks)) < 1:
-                    #     secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
-                    #                     and k != p_info[2] 
-                    #                     and k != stack 
-                    #                     and [p_info[0], k] not in stack_track[stack]['combos']}
-                    # if len(list(secondary_stacks)) < 1:
-                    #     secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
-                    #                 and k != p_info[2] 
-                    #                 and k != stack 
-                    #                 and stack_track[stack]['secondary'].get(k, 0) < stack_max_pair}
+                    
+                    if len(list(secondary_stacks)) < 1:
+                        secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
+                                        and k != p_info[2] 
+                                        and k != stack 
+                                        and [p_info[0], k] not in stack_track[stack]['combos']}
+                    if len(list(secondary_stacks)) < 1:
+                        secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
+                                    and k != p_info[2] 
+                                    and k != stack 
+                                    and k not in stack_track[stack]['secondary']}
+                    if len(list(secondary_stacks)) < 1:
+                        secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
+                                    and k != p_info[2] 
+                                    and k != stack 
+                                    and stack_track[stack]['secondary'].get(k, 0) < stack_max_pair}
                     # if len(list(secondary_stacks)) < 1:
                     #          print('default')
                     #          secondary_stacks = {k:v for k,v in secondary.items() if v > 0 
@@ -1087,7 +1108,8 @@ class FDSlate:
                             sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
                             hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & secondary_stack_filt]
                             if len(hitters.index) == 0:
-                                sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
+                                if fill_high_salary_first:
+                                    sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
                                 hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt]
                             if len(hitters.index) > 0:
                                 hitter = hitters.loc[hitters[non_stack_key].idxmax()]
@@ -1204,7 +1226,8 @@ class FDSlate:
                             sal_filt = ((h['fd_salary'] > s_sal) & (h['fd_salary'] <= (rem_sal + s_sal)))
                             hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & secondary_stack_filt]
                             if len(hitters.index) == 0:
-                                sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
+                                if fill_high_salary_first:
+                                    sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
                                 hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & plat_filt & last_replaced_filt]
                             if len(hitters.index) > 0:
                                 hitter = hitters.loc[hitters[non_stack_key].idxmax()]
@@ -1287,10 +1310,12 @@ class FDSlate:
                         last_replaced_filt = (h['fd_id'] != 1)
                     #redeclare use_teams each pass
                     h_df = h[h['fd_id'].isin(lineup)]
+                    team_counts = dict(h_df['team'].value_counts())
+                    team_counts_list = [z for z, y in team_counts.items() if y > 3 ]
                     used_teams = h_df['team'].unique()
                     #append players already attempted to used_players and filter them out each loop
                     used_filt = (~h['fd_id'].isin(used_players))
-                    dupe_filt = (~h['fd_id'].isin(lineup))
+                    dupe_filt = ((~h['fd_id'].isin(lineup)) & (~h['team'].isin(team_counts_list)))
                     utility = h[h['fd_id'] == lineup[8]]
                     used_players.append(utility['fd_id'])
                     r_salary = utility['fd_salary'].item()
@@ -1311,9 +1336,11 @@ class FDSlate:
                 except (KeyError, ValueError):
                     try:
                         h_df = h[h['fd_id'].isin(lineup)]
+                        team_counts = dict(h_df['team'].value_counts())
+                        team_counts_list = [z for z, y in team_counts.items() if y > 3 ]
                         used_teams = h_df['team'].unique()
                         used_filt = (~h['fd_id'].isin(used_players))
-                        dupe_filt = (~h['fd_id'].isin(lineup))
+                        dupe_filt = ((~h['fd_id'].isin(lineup)) & (~h['team'].isin(team_counts_list)))
                         utility = h[h['fd_id'] == lineup[8]]
                         used_players.append(utility['fd_id'])
                         r_salary = utility['fd_salary'].item()

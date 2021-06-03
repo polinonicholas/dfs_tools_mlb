@@ -819,7 +819,9 @@ class Team(metaclass=IterTeam):
                 p_df['pitches_start'] = self.opp_instance.custom_pps
             key = 'pitches_pa_' + self.o_split
             p_df['exp_x_lu'] = p_df['pitches_start'] / ((h_df[key].sum() + p_ppb) / 2)
-            print(p_df['exp_x_lu'])
+            print(p_df['name'].max())
+            print('!!!!!!!!!!!!!!!!')
+            print(f"{p_df['name'].max()} expected to go through {self.name} LU {p_df['exp_x_lu'].max()} times. P:{p_ppb} LU: {h_df[key].sum()}")
             p_df['exp_bf'] = round((p_df['exp_x_lu'] * 9))
             sp_rollover = floor((p_df['exp_x_lu'] % 1) * 9)
             h_df.loc[h_df['order'] <= sp_rollover, 'exp_pa_sp'] = ceil(p_df['exp_x_lu'])
@@ -840,7 +842,7 @@ class Team(metaclass=IterTeam):
             h_df.loc[righties, 'sp_mu'] = p_df['fd_wpa_b_vr'].max()
             h_df['sp_split'] = h_df[key]
             h_df['exp_ps_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
-            self.lu_talent_sp = h_df['sp_split'].sum()
+            self.lu_talent_sp = h_df['sp_split'].sum() - h_df['sp_split'].std(ddof = 0)
             self.sp_mu = h_df['sp_mu'].sum()
             #points conceded
             key = 'fd_wpa_pa_' + self.o_split
@@ -853,12 +855,17 @@ class Team(metaclass=IterTeam):
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['fd_wps_b_vr'].isna()), 'fd_wps_b_vr'] = p_q_r_vr['fd_wps_b_vr'].median()
                 p_df.loc[(p_df['batters_faced_vl'] < 25) | (p_df['fd_wps_b_vl'].isna()), 'fd_wps_b_vl'] = p_q_r_vl['fd_wps_b_vl'].median()
                 
-            h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
-            h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
+            # h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
+            # h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1) + (h_df[key] * 1)) / 2)
+            h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1) + (h_df[key] * 1)) / 2)
+            # h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
+            h_df['exp_pc_sp_raw'] = h_df[key]
             h_df['raw_exp_pc_sp'] = h_df[key]
-            h_df.loc[lefties, 'exp_k'] = (((p_df['k_b_vl'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[righties, 'exp_k'] = (((p_df['k_b_vr'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
+            h_df.loc[lefties, 'exp_k'] = (((p_df['k_b_vl'].max() * 1) + (h_df[k_key] * 1)) / 2)
+            h_df.loc[righties, 'exp_k'] = (((p_df['k_b_vr'].max() * 1) + (h_df[k_key] * 1)) / 2)
+            # h_df.loc[lefties, 'exp_k'] = (((p_df['k_b_vl'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
+            # h_df.loc[righties, 'exp_k'] = (((p_df['k_b_vr'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
             h_df['exp_k_sp_raw'] = h_df[k_key]
             if p_df['pitch_hand'].item() == 'L':
                 p_df.loc[(p_df['batters_faced_vr'] < 25) | (p_df['ra-_b_vr'].isna()), 'ra-_b_vr'] = p_q_l_vr['ra-_b_vr'].median()
@@ -870,6 +877,7 @@ class Team(metaclass=IterTeam):
             exp_pa_l_sp = h_df.loc[lefties, 'exp_pa_sp'].sum()
             p_df['exp_ra'] = floor((exp_pa_r_sp * p_df['ra-_b_vr'].max()) + (exp_pa_l_sp * p_df['ra-_b_vl'].max()))
             p_df['exp_inn'] = (p_df['exp_bf'].max() - p_df['exp_ra'].max()) / 3
+            h_df['sp_exp_inn'] = p_df['exp_inn'].max()
             if self.is_home:
                 exp_bp_inn = 9 - p_df['exp_inn'].max()
             else:
@@ -902,7 +910,10 @@ class Team(metaclass=IterTeam):
                 h_df.loc[h_df['order'] == order, 'exp_pa_bp'] += 1
                 order += 1
                 exp_bf_bp -= 1
-            h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
+            h_df.loc[lefties, 'exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_vl'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
+            h_df.loc[righties, 'exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_vr'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
+            
+            # h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
             
             self.raw_points = h_df['exp_ps_raw'].sum()
@@ -931,7 +942,7 @@ class Team(metaclass=IterTeam):
             self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
             self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
             self.sp_mu = h_df['sp_mu'].sum()
-            self.lu_talent_sp = h_df['sp_split'].sum()
+            self.lu_talent_sp = h_df['sp_split'].sum() - h_df['sp_split'].std(ddof = 0)
             h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
         return h_df
     def sp_df(self):
@@ -967,11 +978,13 @@ class Team(metaclass=IterTeam):
             print('Getting default SP stats.')
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
-        p_df['k_pred'] = h_df['exp_k'].sum()
-        p_df['k_pred_raw'] = h_df['exp_k_sp_raw'].sum()
-        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum()
-        p_df['mu'] = h_df['exp_pc_sp_raw'].sum()
-        p_df['raw_mu'] = h_df['raw_exp_pc_sp'].sum()
+        p_df['opponent'] = self.opp_instance.name
+        p_df['exp_inn'] = h_df['sp_exp_inn'].max()
+        p_df['k_pred'] = h_df['exp_k'].sum() - h_df['exp_k'].std(ddof = 0)
+        p_df['k_pred_raw'] = h_df['exp_k_sp_raw'].sum() -  h_df['exp_k_sp_raw'].std(ddof = 0)
+        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() - h_df['exp_pc_sp'].std(ddof = 0)
+        p_df['mu'] = h_df['exp_pc_sp'].sum() - h_df['exp_pc_sp'].std(ddof = 0)
+        p_df['raw_mu'] = h_df['raw_exp_pc_sp'].sum() - h_df['raw_exp_pc_sp'].std(ddof = 0)
         # p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
         p_df['venue_points'] = (p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)) - p_df['exp_ps_raw']
         p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
@@ -1244,8 +1257,8 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        if self.name == 'rangers' or self.opp_name == 'rangers':
-            return 1.1
+        # if self.name == 'rangers' or self.opp_name == 'rangers':
+        #     return 1.1
         # if len(self.next_venue_data.index) < 100:
         #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1419,10 +1432,5 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
 
-# twins.lineup
-# test = p_splits[p_splits['name'] == 'Michael Wacha']
 
-# test[['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
 
-# athletics.clear_all_team_cache()
-# , custom_lineup = [643565, 573262, 457763, 474832, 543105, 446334, 543063, 456781, 622072]
