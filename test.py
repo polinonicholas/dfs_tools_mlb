@@ -21,10 +21,12 @@ pd.set_option('display.max_rows', None)
 #                  heavy_weight_stack=False, 
 #                  heavy_weight_p=False, 
 #                  salary_batting_order=5):
+    
+    
         
 s=FDSlate(
-          p_fades = [],
-          h_fades = [],
+          p_fades = ['tigers'],
+          h_fades = ['pirates', 'indians', 'cardinals'],
           salary_batting_order=5,
           )
 
@@ -109,17 +111,23 @@ hitter_mlb_ids = hitters[['name', 'mlb_id']]
 lineups = s.build_lineups(
                       info_only = False,
                       custom_stacks_info = {
- 'nationals': 20,
- 'dodgers': 10,
- 'marlins': 10,
- 'athletics': 20,
- 'twins': 30,
- 'orioles': 20,
- 'braves': 20,
- 'rockies': 20,
-},
+ 
+ 
+ 'dodgers': 0,
+ 'astros': 0,
+ 'red sox': 0,
+ 'royals': 0,
+ 'rockies': 0,
+ 'mariners': 0,
+ 'twins': 0,
+ 'tigers': 0,
+ 'angels': 0,
+ 'orioles': 0,
+ 'braves': 0,
+ 'reds': 0,
+ },
                       median_pitcher_salary = None,
-                      low_pitcher_salary = None,
+                      low_pitcher_salary = 9500,
                       high_pitcher_salary = None,
                       max_pitcher_salary = None,
                       median_team_salary = None,
@@ -130,7 +138,7 @@ lineups = s.build_lineups(
                       stack_max_pair = 0,
                       
                       lus = 150, 
-                      index_track = 0, 
+                      index_track = 1, 
                       non_random_stack_start=0,
                       
                       max_lu_total = 60,
@@ -138,7 +146,7 @@ lineups = s.build_lineups(
                       below_avg_count = 0,
                       below_order_count = 135,
                       risk_limit = 125,
-                      of_count_adjust = 66,
+                      of_count_adjust = 6,
                       max_lu_stack = 50, 
                       
                       
@@ -147,10 +155,10 @@ lineups = s.build_lineups(
                       
                       
                       fallback_stack_sample = 6,
-                      stack_expand_limit = 150,
+                      stack_expand_limit = 20,
                       
                       max_order=7,
-                      non_stack_max_order=5, 
+                      non_stack_max_order=4, 
                      
                       non_stack_quantile = .9, 
                       high_salary_quantile = .9,
@@ -160,15 +168,15 @@ lineups = s.build_lineups(
                       
                       max_sal = 35000,
                       util_replace_filt = 200,
-                      single_stack_surplus = 400,
-                      double_stack_surplus = 400,
-                      pitcher_surplus = 1000,
+                      single_stack_surplus = 900,
+                      double_stack_surplus = 900,
+                      pitcher_surplus = 1,
                       
                       
                       fill_high_salary_first = False,
                       select_max_pitcher = True,
-                      no_surplus_secondary_stacks=True,
-                      find_cheap_stacks = False,
+                      no_surplus_secondary_stacks=False,
+                      find_cheap_stacks = True,
                       always_pitcher_first=True,
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = True,
@@ -178,45 +186,58 @@ lineups = s.build_lineups(
                       remove_positions = None,
                       
                       exempt=[],
-                      all_in=['rockies', 'twins'],
+                      all_in=[],
                       lock = [],
                       #pitcher
                       no_combos = [],
                       #position
                       never_replace=[],
                       x_fallback = [],
-                      stack_only = ['marlins'],
+                      stack_only = ['rockies', 'twins'],
                       limit_risk = [],
                       #stacks/h
                       no_combine = [],
                       always_replace_first = [],
                       custom_counts={},
-                      custom_pitchers = {10:100, 11:50},
+                      custom_pitchers = {8:75, 10: 75, 19: 0}  ,
                       custom_stacks = {
- 'nationals': 20,
- 'dodgers': 15,
- 'marlins': 10,
- 'athletics': 20,
- 'twins': 30,
- 'orioles': 20,
- 'braves': 15,
- 'rockies': 20,
- 'rangers': 0}
-,
-                      custom_secondary = {
- 'nationals': 10,
- 'dodgers': 10,
- 'rays': 10,
+ 'white sox': 0,
+ 'yankees': 10,
+ 'phillies': 15,
+ 'mets': 15,
+ 'rays': 0,
+ 'dodgers': 0,
  'astros': 10,
- 'blue jays': 10,
- 'mariners': 10,
- 'athletics': 10,
+ 'red sox': 15,
+ 'royals': 10,
+ 'rockies': 0,
+ 'mariners': 15,
+ 'twins': 0,
+ 'tigers': 15,
+ 'angels': 10,
+ 'orioles': 10,
+ 'braves': 15,
+ 'reds': 10,
+ },
+                      custom_secondary = {
  
+ 'yankees': 10,
+ 'phillies': 10,
+ 'mets': 10,
+ 'astros': 10,
+ 'red sox': 10,
+ 'royals': 10,
+ 'mariners': 10,
+ 'tigers': 10,
+ 'angels': 10,
  'orioles': 10,
  'braves': 10,
- 'rockies': 10,
- 'rangers': 15},
+ 'reds': 10,
+ },
                       )
+
+
+
 
 
 
@@ -243,34 +264,7 @@ lineups = s.build_lineups(
 #                           }
 
 
-{
- 'nationals': 20,
- 'dodgers': 15,
- 'marlins': 10,
- 'athletics': 20,
- 'twins': 30,
- 'orioles': 20,
- 'braves': 15,
- 'rockies': 20,
- 'rangers': 0}
-
-
-
-
-
-
-{
- 'nationals': 10,
- 'dodgers': 10,
- 'rays': 10,
- 'astros': 10,
- 'blue jays': 10,
- 'mariners': 10,
- 'athletics': 10,
- 'orioles': 15,
- 'braves': 10,
- 'rockies': 10,
- 'rangers': 10}
+   
 
 
 #dict p_df.index: p_df: lineups to be in
@@ -293,8 +287,8 @@ all_stacks['p_z'] = (all_stacks['raw_points'] - all_stacks['raw_points'].mean())
 all_stacks['s_z'] = ((all_stacks['salary'] - all_stacks['salary'].mean()) / all_stacks['salary'].std()) * -1
 all_stacks['mu_z'] = (all_stacks['sp_mu'] - all_stacks['sp_mu'].mean()) / all_stacks['sp_mu'].std()
 all_stacks['t_z'] = (all_stacks['raw_talent'] - all_stacks['raw_talent'].mean()) / all_stacks['raw_talent'].std()
-all_stacks['z'] = ((all_stacks['p_z'] * 2) + (all_stacks['s_z'] * 2) + (all_stacks['mu_z'] * 2) + (all_stacks['t_z'] * 1.75)  + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.25)) / 10
-all_stacks['mz'] = ((all_stacks['p_z'] * 2.5) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 2.5) + (all_stacks['t_z'] * 2.25) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.75)) / 10
+all_stacks['z'] = ((all_stacks['p_z'] * 2.5) + (all_stacks['s_z'] * 2) + (all_stacks['mu_z'] * 2) + (all_stacks['t_z'] * 1.25)  + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.25)) / 10
+all_stacks['mz'] = ((all_stacks['p_z'] * 3) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 2.5) + (all_stacks['t_z'] * 1.75) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.75)) / 10
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
                          'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav']].sort_values(by='points', ascending=False)
 
@@ -414,11 +408,11 @@ third = s.third_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salar
 of = s.of_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 util = s.util_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 #lookup individual hitter statcast
-player_name = 'brinson'
+player_name = 'altuve'
 hitter_statcast_time = str(tf.fifteen_days)
 hitter_mlb_ids[hitter_mlb_ids['name'].str.lower().str.contains(player_name)]
 
-hitter_plays = get_statcast_h(621446, 2021)
+hitter_plays = get_statcast_h(514888, 2021)
 filtered_hitter_plays = hitter_plays[(hitter_plays['date'] >= hitter_statcast_time)].reset_index()
 filtered_hitter_plays['distance'].count()
 filtered_hitter_plays.describe()
@@ -426,7 +420,7 @@ filtered_hitter_plays.describe()
 
 track_df = pd.DataFrame(lineups)
 track_df.index
-track_df.loc['combos', 'rockies']
+track_df.loc['combos', 'blue jays']
 
 
 #AFTER BUILDING LINEUPS
@@ -437,5 +431,7 @@ hc_index = hc_df['t_count'].nlargest(60).index
 pitcher_counts = pc_df.loc[pc_index, ['name', 't_count', 'fd_salary', 'team', 'fd_id','points','pitches_start', 'batters_faced_sp', 'exp_ps_raw']]
 hitter_counts = hc_df.loc[hc_index, ['name', 't_count',  'fd_salary', 'order',  'fd_position', 'fd_id', 'team', 'points', 'fd_wps_pa' ]].set_index('name') 
 
-s.finalize_entries()  
+s.finalize_entries()
+
+{8:75, 10: 75, 19: 0}  
 

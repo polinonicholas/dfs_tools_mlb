@@ -234,8 +234,8 @@ all_stacks['p_z'] = (all_stacks['raw_points'] - all_stacks['raw_points'].mean())
 all_stacks['s_z'] = ((all_stacks['salary'] - all_stacks['salary'].mean()) / all_stacks['salary'].std()) * -1
 all_stacks['mu_z'] = (all_stacks['sp_mu'] - all_stacks['sp_mu'].mean()) / all_stacks['sp_mu'].std()
 all_stacks['t_z'] = (all_stacks['raw_talent'] - all_stacks['raw_talent'].mean()) / all_stacks['raw_talent'].std()
-all_stacks['z'] = ((all_stacks['p_z'] * 2) + (all_stacks['s_z'] * 2) + (all_stacks['mu_z'] * 2) + (all_stacks['t_z'] * 1.75)  + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.25)) / 10
-all_stacks['mz'] = ((all_stacks['p_z'] * 2.5) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 2.5) + (all_stacks['t_z'] * 2.25) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.75)) / 10
+all_stacks['z'] = ((all_stacks['p_z'] * 2.5) + (all_stacks['s_z'] * 2) + (all_stacks['mu_z'] * 2) + (all_stacks['t_z'] * 1.25)  + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.25)) / 10
+all_stacks['mz'] = ((all_stacks['p_z'] * 3) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 2.5) + (all_stacks['t_z'] * 1.75) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.75)) / 10
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
                          'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav']].sort_values(by='points', ascending=False)
 

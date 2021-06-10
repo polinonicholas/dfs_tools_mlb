@@ -727,6 +727,8 @@ class Team(metaclass=IterTeam):
                             self.update_lineup(lineup_ids, self.opp_sp_hand)
                         h_df = h_df.append(new_row, ignore_index = True)
             sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
+            #new
+            h_df = h_df.loc[~h_df.duplicated(subset=['mlb_id'])]
             h_df['order'] = h_df['mlb_id'].map(sorter)
             h_df.sort_values(by='order',inplace=True, kind='mergesort')
             h_df['order'] = h_df['order'] + 1
@@ -1257,8 +1259,8 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        # if self.name == 'rangers' or self.opp_name == 'rangers':
-        #     return 1.1
+        if self.name == 'rangers' or self.opp_name == 'rangers':
+            return 1.05
         # if len(self.next_venue_data.index) < 100:
         #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1431,6 +1433,5 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
 
 

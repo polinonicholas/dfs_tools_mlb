@@ -6,7 +6,7 @@ test = game_data[game_data['temp'] == 57]
 
 dejong = game_data[(game_data['home_sp'] == 640464) | (game_data['away_sp'] == 640464)]
 
-p_splits.loc[p_splits['mlb_id'] == 640464, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
+p_splits.loc[p_splits['mlb_id'] == 666129, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
 
 oviado['home_score']
 

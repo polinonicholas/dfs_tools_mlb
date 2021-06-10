@@ -457,6 +457,7 @@ class FDSlate:
             s = self.stacks_df()['stacks'].to_dict()
         else:
             s = custom_stacks
+        
         if not custom_secondary:
             secondary = self.stacks_df()['stacks'].to_dict()
         else:
@@ -578,7 +579,7 @@ class FDSlate:
                     non_random_stack = stack_list[non_random_stack_start]
                     stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2] and k == non_random_stack}
                     non_random_stack_attempts += 1
-                if non_random_stack_attempts > len(stack_list):
+                if non_random_stack_attempts >= len(stack_list):
                     stacks = {k:v for k,v in s.items() if v > 0 and k != p_info[2]}
                 
                 non_random_stack_start += 1
@@ -589,21 +590,21 @@ class FDSlate:
             try:
                 stack = random.choice(list(stacks.keys()))
             except IndexError:
-                print(f"Trying to stack {stack} against pitcher for {p_info[2]}.")
+                print("Error....")
                 continue
             remaining_stacks = stacks[stack]
             #lookup players on the team for the selected stack
             stack_df = h[h['team'] == stack]
-            # if remaining_stacks % 3 == 0:
-            #     stack_key = 'order'
+            if remaining_stacks % 3 == 0:
+                stack_key = 'points'
             # elif remaining_stacks % 3 == 0 and find_cheap_stacks:
             #     stack_key = 'points_salary'
             # elif remaining_stacks % 3 == 0:
             #     stack_key = 'fd_hr_weight'
-            if remaining_stacks % 2 == 0:
+            elif remaining_stacks % 2 == 0:
                 stack_key = 'order'
             else:
-                stack_key = 'exp_ps_sp_pa'
+                stack_key = 'sp_split'
             if lus % 2 == 0:
                 non_stack_key='exp_ps_sp_pa'
                 pitcher_replace_key = 'k_pred'
