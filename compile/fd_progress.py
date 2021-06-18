@@ -214,7 +214,7 @@ class FDSlate:
                 df.drop(filt, inplace = True)
         df['i_z'] = FDSlate.df_z_score(df, 'exp_inn')
         df['f_z'] = FDSlate.df_z_score(df, 'fav')
-        # df['vt_z'] = FDSlate.df_z_score(df, 'venue_temp', mult = -1)
+        df['vt_z'] = FDSlate.df_z_score(df, 'venue_temp', mult = -1)
         df['v_z'] = FDSlate.df_z_score(df, 'venue_avg', mult = -1)
         df['u_z'] = FDSlate.df_z_score(df, 'ump_avg', mult = -1)
         df['p_z'] = FDSlate.df_z_score(df, 'exp_ps_raw')
@@ -222,11 +222,11 @@ class FDSlate:
         df['mu_z'] = FDSlate.df_z_score(df, 'mu')
         df['kp_z'] = FDSlate.df_z_score(df, 'k_pred')
         df['rk_z'] = FDSlate.df_z_score(df, 'k_pred_raw')
-        df['s_z'] = FDSlate.df_z_score(df, 'fd_salary', mult = -1)
+        df['s_z'] = FDSlate.df_z_score(df, 'env_points', mult = -1)
         df['pps_z'] = FDSlate.df_z_score(df, 'pitches_start')
-        df['e_z'] = FDSlate.df_z_score(df, 'env_points', mult = -1)
-        df['z'] = ((df['f_z'] * .5) + (df['rmu_z'] * 1) + (df['i_z'] * 2.5) + (df['p_z'] * 2) + (df['rk_z'] * 1.5) + (df['s_z'] * 1) + (df['e_z'] * 1.5)) / 10
-        df['mz'] = ((df['f_z'] * 1) + (df['rmu_z'] * 1) + (df['i_z'] * 3) + (df['p_z'] * 2) + (df['kp_z'] * 1.5) + (df['s_z'] * 0) + (df['e_z'] * 1.5)) / 10       
+        df['e_z'] = FDSlate.df_z_score(df, 'env_points')
+        df['z'] = ((df['f_z'] * .5) + (df['i_z'] * 3) + (df['p_z'] * 2) + (df['kp_z'] * 1.5) + (df['s_z'] * 1) + (df['e_z'] * 2)) / 10
+        df['mz'] = ((df['f_z'] * 1) + (df['i_z'] * 3.5) + (df['p_z'] * 2) + (df['kp_z'] * 1.5) + (df['s_z'] * 0) + (df['e_z'] * 2)) / 10       
         return df
     
     def points_df(self, refresh = False):
@@ -247,8 +247,8 @@ class FDSlate:
         df['u_z'] = FDSlate.df_z_score(df, 'ump_avg')
         df['e_z'] = FDSlate.df_z_score(df, 'env_avg')
         df['sa_z'] = FDSlate.df_z_score(df, 'sp_avg')
-        df['z'] = (((df['p_z'] * 2.75) + (df['s_z'] * 2.25) + (df['sa_z'] * 2.5) + (df['e_z'] * 2.5)) / 10)
-        df['mz'] = (((df['p_z'] * 3.75) + (df['sa_z'] * 2.75) + (df['e_z'] * 3.5)) / 10)
+        df['z'] = (((df['p_z'] * 2.75) + (df['s_z'] * 2) + (df['sa_z'] * 2.5) + (df['e_z'] * 2.75)) / 10)
+        df['mz'] = (((df['p_z'] * 3.33) + (df['sa_z'] * 3.33) + (df['e_z'] * 3.33)) / 9.99)
         return df
     
     @cached_property
@@ -286,7 +286,7 @@ class FDSlate:
         df.drop(index = i, inplace=True)
         df['p_z'] = FDSlate.df_z_score(df, 'raw_points')
         df['v_z'] = FDSlate.df_z_score(df, 'venue_avg')
-        df['s_z'] = FDSlate.df_z_score(df, 'salary', mult=-1)
+        df['s_z'] = FDSlate.df_z_score(df, 'salary')
         df['mu_z'] = FDSlate.df_z_score(df, 'sp_mu')
         df['t_z'] = FDSlate.df_z_score(df, 'raw_talent')
         df['u_z'] = FDSlate.df_z_score(df, 'ump_avg')
@@ -303,7 +303,7 @@ class FDSlate:
             if self.stack_salary_factor:
                 df_c['z'] = (((df_c['p_z'] * 2.75) + (df_c['s_z'] * 2) + (df_c['sa_z'] * 2.5) + (df_c['e_z'] * 2.75)) / 10) + increment
             else:
-                df_c['z'] = (((df['p_z'] * 3.75) + (df['sa_z'] * 2.75) + (df['e_z'] * 3.5)) / 10) + increment
+                df_c['z'] = (((df_c['p_z'] * 3.33) + (df_c['sa_z'] * 3.33) + (df_c['e_z'] * 3.33)) / 9.99) + increment
             df_c = df_c[df_c['z'] > 0]
             lu_base = lineups / len(df_c.index)
             df_c['stacks'] = lu_base * df_c['z']
@@ -667,10 +667,10 @@ class FDSlate:
                 stack_key = 'sp_split'
             if lus % 2 == 0:
                 non_stack_key='exp_ps_raw'
-                pitcher_replace_key = 'exp_inn'
+                pitcher_replace_key = 'k_pred'
             else:
                 non_stack_key='points'
-                pitcher_replace_key = 'exp_inn'
+                pitcher_replace_key = 'mu'
             #filter the selected stack by stack_sample arg.
 
             if remaining_stacks > stack_expand_limit:
@@ -1138,7 +1138,7 @@ class FDSlate:
                 #             #filter out players with a salary less than high_salary_quantile arg
                 #             sal_filt = ((h['fd_salary'] >= np.floor(h['fd_salary'].quantile(high_salary_quantile))) & (h['fd_salary'] <= (rem_sal + s_sal)))
                 #             hitters = h[pos_filt & stack_filt & dupe_filt & fade_filt & opp_filt & sal_filt & count_filt & order_filt & secondary_stack_filt]
-                if not reset and (enforce_hitter_surplus or (p_info[0] in lock and always_replace_pitcher_lock)) and rem_sal > max_surplus and (not new_combo or p_info[0] in no_combos or not no_surplus_secondary_stacks):
+                if not reset and (enforce_hitter_surplus or (p_info[0] in lock and always_replace_pitcher_lock)) and rem_sal > max_surplus and (not new_combo or p_info[0] in no_combos):
                     random.shuffle(needed_pos)    
                     for ps in needed_pos:
                         if rem_sal <= max_surplus:
@@ -1227,7 +1227,7 @@ class FDSlate:
                         lineup[0] = np_id
             else:
                 
-                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus and p_info[0] not in lock and (not new_combo or p_info[0] in no_combos or not no_surplus_secondary_stacks):
+                if not reset and enforce_pitcher_surplus and rem_sal > pitcher_surplus and p_info[0] not in lock and (not new_combo or p_info[0] in no_combos):
                     #filter out pitchers who would put the salary over the max_sal if inserted
                     current_pitcher = p.loc[pi]
                     cp_sal = current_pitcher['fd_salary'].item()

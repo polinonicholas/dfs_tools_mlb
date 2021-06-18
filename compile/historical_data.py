@@ -88,7 +88,6 @@ def past_seasons(seasons=range(2010,int(current_season()['season_id'])),path=jso
         print(f"Saved season info. for {seasons[0]}-{seasons[-1]} to {path}.")
         return season_list
     
-    
 #get historical data for a given season, pickled as list of dictionaries.
 #use a for loop for multiple years.
 def get_historical_data(year):
@@ -162,6 +161,8 @@ def get_historical_data(year):
                                         d['hits'] = home_team['hits'] + away_team['hits']
                                         d['home_score'] = home_team['runs']
                                         d['away_score'] = away_team['runs']
+                                        d['home_hits'] = home_team['hits']
+                                        d['away_hits'] = away_team['hits']
                                         d['venue_id'] = y['venue']['id']
                                         d['home_runs'] = 0
                                         for z in y['scoringPlays']:

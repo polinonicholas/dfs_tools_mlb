@@ -40,7 +40,7 @@ class IterTeam(type):
 class Team(metaclass=IterTeam):
     _all_teams = []
     def __init__(self, mlb_id, name='', custom_lineup=None, custom_sp=None, ppd=False,
-                 custom_pps=None):
+                 custom_pps=None, custom_temp = None):
         self._all_teams.append(self)
         self.id = mlb_id
         self.name = name
@@ -48,6 +48,7 @@ class Team(metaclass=IterTeam):
         self.custom_sp = custom_sp
         self.ppd = ppd
         self.custom_pps = custom_pps
+        self.custom_temp = custom_temp
     @cached_property
     def depth(self):
         file = pickle_path(name=f"{self.name}_depth_{tf.today}", directory=settings.DEPTH_DIR)
@@ -703,29 +704,31 @@ class Team(metaclass=IterTeam):
                 fg_stats = Stats.current_stats()
                 h_df = sm_merge(h_df, fg_stats, columns=['name', 'team'], ratios=[.63, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('', '_fg'))
                 h_df = drop(h_df)
-            h_df = h_df[~((h_df['position'].astype(str).isin(mac.players.p)) & (h_df['mlb_id'] != 660271))]
-            if not self.is_dh and len(h_df.index) == 9:
-                h_key = 'fd_wps_pa_' + self.o_split
-                i_d = h_df.loc[h_df[h_key].idxmin(), 'mlb_id'].item()
-                h_df.drop(h_df[h_key].idxmin(), inplace=True)
-                new_row = self.get_replacement('S', 'Pitcher', lineup_ids)
-                h_df = h_df.append(new_row, ignore_index = True)
-                lineup_ids.remove(i_d)
-                lineup_ids.append(int(new_row['mlb_id']))
-            if len(h_df.index) < 9:
-                for i_d in lineup_ids:
-                    if i_d not in h_df['mlb_id'].values:
-                        new_row = roster[roster['mlb_id'] == i_d]
-                        new_row = new_row[~new_row['position'].astype(str).isin(mac.players.p)]
-                        if len(new_row.index) == 0:
-                            player = statsapi.get('people', {'personIds': i_d})
-                            position = player['people'][0]['primaryPosition']['code']
-                            position_type = player['people'][0]['primaryPosition']['type']
-                            new_row = self.get_replacement(position, position_type, lineup_ids)
-                            index = lineup_ids.index(i_d)
-                            lineup_ids[index] = int(new_row['mlb_id'])
-                            self.update_lineup(lineup_ids, self.opp_sp_hand)
-                        h_df = h_df.append(new_row, ignore_index = True)
+            
+            if not self.custom_lineup:
+                h_df = h_df[~((h_df['position'].astype(str).isin(mac.players.p)) & (h_df['mlb_id'] != 660271))]
+                if not self.is_dh and len(h_df.index) == 9:
+                    h_key = 'fd_wps_pa_' + self.o_split
+                    i_d = h_df.loc[h_df[h_key].idxmin(), 'mlb_id'].item()
+                    h_df.drop(h_df[h_key].idxmin(), inplace=True)
+                    new_row = self.get_replacement('S', 'Pitcher', lineup_ids)
+                    h_df = h_df.append(new_row, ignore_index = True)
+                    lineup_ids.remove(i_d)
+                    lineup_ids.append(int(new_row['mlb_id']))
+                if len(h_df.index) < 9:
+                    for i_d in lineup_ids:
+                        if i_d not in h_df['mlb_id'].values:
+                            new_row = roster[roster['mlb_id'] == i_d]
+                            new_row = new_row[~new_row['position'].astype(str).isin(mac.players.p)]
+                            if len(new_row.index) == 0:
+                                player = statsapi.get('people', {'personIds': i_d})
+                                position = player['people'][0]['primaryPosition']['code']
+                                position_type = player['people'][0]['primaryPosition']['type']
+                                new_row = self.get_replacement(position, position_type, lineup_ids)
+                                index = lineup_ids.index(i_d)
+                                lineup_ids[index] = int(new_row['mlb_id'])
+                                self.update_lineup(lineup_ids, self.opp_sp_hand)
+                            h_df = h_df.append(new_row, ignore_index = True)
             sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
             #new
             h_df = h_df.loc[~h_df.duplicated(subset=['mlb_id'])]
@@ -959,6 +962,7 @@ class Team(metaclass=IterTeam):
             p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
             p_df['ump_points'] = (p_df['exp_ps_raw'] * (-self.ump_boost % 2)) - p_df['exp_ps_raw']
             p_df['points'] = p_df['exp_ps_raw'] + p_df['venue_points'] + p_df['temp_points'] + p_df['ump_points']
+            p_df['env_points'] = self.env_avg
             return p_df
         try:
             p_info = projected_sp
@@ -995,6 +999,7 @@ class Team(metaclass=IterTeam):
         p_df['ump_avg'] = self.ump_avg
         p_df['venue_temp'] = self.venue_temp
         p_df['venue_avg'] = self.venue_avg
+        p_df['env_points'] = self.env_avg
         
         if self.name in daily_info['confirmed_sp']:
             with open(file, "wb") as f:
@@ -1192,16 +1197,18 @@ class Team(metaclass=IterTeam):
         return condition
     @cached_property
     def venue_temp(self):
+        if self.custom_temp:
+            return self.custom_temp
         if self.weather:
             temp = self.weather.get('temp')
             if temp and not self.roof_closed:
                 try:
                     return int(temp)
                 except ValueError:
-                    return ''
+                    return self.next_venue_data['temp'].median()
         if self.roof_closed:
             return 72
-        return ''
+        return self.next_venue_data['temp'].median()
     @cached_property
     def roof_closed(self):
         return ((self.next_has_roof and not self.venue_condition) or self.venue_condition in mac.weather.roof_closed)
@@ -1259,8 +1266,8 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        if self.name == 'rangers' or self.opp_name == 'rangers':
-            return 1.05
+        # if self.name == 'rangers' or self.opp_name == 'rangers':
+        #     return 1.05
         # if len(self.next_venue_data.index) < 100:
         #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1299,6 +1306,25 @@ class Team(metaclass=IterTeam):
             return df['fd_points'].mean() / game_data['fd_points'].mean()
         return 1
     @cached_property
+    def temp_avg(self):
+        if self.venue_temp:
+            count = 0
+            mult = .01
+            temp  = self.venue_temp
+            data = game_data[game_data['condition'].isin(mac.weather.roof_open)]
+            if len(data.index) < 10000:
+                stop = len(data.index) * .1
+            else:
+                stop = 1000
+            while count < stop:
+                df = data[data['temp'].between(temp - mult, temp + mult, inclusive=False)]
+                count = len(df.index)
+                mult += 1
+            return df['fd_points'].mean()
+        return game_data['fd_points'].mean()
+    
+        
+    @cached_property
     def ump_boost(self):
         if len(self.projected_ump_data.index) >= 100:
             return self.projected_ump_data['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1308,6 +1334,59 @@ class Team(metaclass=IterTeam):
         if len(self.projected_ump_data.index) >= 100:
             return self.projected_ump_data['fd_points'].mean()
         return game_data['fd_points'].mean()
+    @cached_property
+    def env_avg(self):
+        temp = self.temp_avg
+        ump = self.ump_avg
+        venue = self.venue_avg
+        if self.next_has_roof:
+            return (ump + venue) / 2
+        else:
+            return (temp + ump + venue) / 3
+    
+    
+    def sp_avg(self, return_full_dict = False):
+        away = game_data[(game_data['away_sp'] == self.opp_sp['id'])]
+        home = game_data[(game_data['home_sp'] == self.opp_sp['id'])]
+        if len(away.index) > 0:
+            away_score = away['home_score'].mean()
+            away_hits = away['home_hits'].mean()
+        else:
+            away_score = game_data['home_score'].median()
+            away_hits = game_data['home_hits'].median()
+        if len(home.index) > 0:
+            home_score = home['away_score'].mean()
+            home_hits = home['away_hits'].mean()
+        else:
+            home_score = game_data['away_score'].median()
+            home_hits = game_data['away_hits'].median()
+        
+        total_score = (away_score + home_score) / 2
+        total_hits = (away_hits + home_hits) / 2
+        home_fd_points = (home_score * 6.7) + (home_hits * 3)
+        away_fd_points = (away_score * 6.7) + (away_hits * 3)
+        total_fd_points = (total_score * 6.7) + (total_hits * 3)
+        
+        sp_information = {'avg_home_score': home_score,
+                'avg_away_score': away_score,
+                'avg_home_hits': home_hits,
+                'avg_away_hits': away_hits,
+                'sample_home': len(home.index),
+                'sample_away': len(away.index),
+                'avg_hits': total_hits,
+                'avg_score': total_score,
+                'home_fd': home_fd_points,
+                'away_fd': away_fd_points,
+                'total_fd': total_fd_points,
+                'pitcher': self.opp_sp['fullName']}
+        if return_full_dict:
+            return sp_information
+        if self.is_home:
+            return sp_information['away_fd']
+        else:
+            return sp_information['home_fd']
+
+
     
 
     @cached_property
@@ -1433,5 +1512,4 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
 

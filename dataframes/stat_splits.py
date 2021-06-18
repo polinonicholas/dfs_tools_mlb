@@ -5,6 +5,7 @@ import pandas as pd
 from dfs_tools_mlb.utils.time import time_frames as tf
 import pickle
 from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
+from dfs_tools_mlb.compile import current_season as cs
 
 data_path_h = settings.STORAGE_DIR.joinpath(f'player_data_h_{tf.today}.pickle')
 data_path_p = settings.STORAGE_DIR.joinpath(f'player_data_p_{tf.today}.pickle')
@@ -221,15 +222,34 @@ hp_q = hp[hp_q_filt]
 
 
 
+
+
+
+
 if not data_path_p.exists():
 
     p_splits = pd.DataFrame(get_splits_p(range(settings.stat_range['player_start'], settings.stat_range['end']),sport=1,pool='ALL',get_all=True))
     
-    
-    values = {'games_sp_21': 0, 'games_21': 0, 'wins_21': 0, 'losses_21': 0, 'saves_21': 0, 
-              'save_chances_21': 0, 'holds_21': 0, 'complete_games_21': 0, 'shutouts_21': 0,
-              'games_sp_20': 0, 'games_20': 0, 'wins_20': 0, 'losses_20': 0, 'saves_20': 0, 
-              'save_chances_20': 0, 'holds_20': 0, 'complete_games_20': 0, 'shutouts_20': 0}
+    first_season = cs['season_id'][-2:]
+    second_season = str(int(cs['season_id'][-2:]) - 1)
+    values = {f'games_sp_{first_season}': 0, 
+              f'games_{first_season}': 0, 
+              f'wins_{first_season}': 0, 
+              f'losses_{first_season}': 0, 
+              f'saves_{first_season}': 0, 
+              f'save_chances_{first_season}': 0, 
+              f'holds_{first_season}': 0, 
+              f'complete_games_{first_season}': 0, 
+              f'shutouts_{first_season}': 0,
+              f'games_sp_{second_season}': 0, 
+              f'games_{second_season}': 0, 
+              f'wins_{second_season}': 0, 
+              f'losses_{second_season}': 0, 
+              f'saves_{second_season}': 0, 
+              f'save_chances_{second_season}': 0, 
+              f'holds_{second_season}': 0, 
+              f'complete_games_{second_season}': 0, 
+              f'shutouts_{second_season}': 0}
     p_splits.fillna(value=values, inplace=True)
     
         
@@ -393,7 +413,7 @@ if not data_path_p.exists():
     p_splits['fd_wp_weight_vl'] = (((p_splits['wild_pitches_vl'] * weight_sb) * er) / p_splits['batters_faced_vl'])
     p_splits['fd_cs_weight_vl'] = (((p_splits['cs_vl'] * weight_cs) * er) / p_splits['batters_faced_vl'])
     p_splits['fd_ip_weight_vl'] = ((p_splits['ip_vl'] * i) / p_splits['batters_faced_vl'])
-    p_splits['fd_k_weight_vl'] = ((p_splits['k_vr'] * k) / p_splits['batters_faced_vl'])
+    p_splits['fd_k_weight_vl'] = ((p_splits['k_vl'] * k) / p_splits['batters_faced_vl'])
     
     #weighted points scored/batter faced - left
     p_splits['fd_wps_b_vl'] = p_splits['fd_bb_weight_vl'] + p_splits['fd_hb_weight_vl'] + p_splits['fd_1b_weight_vl'] + \

@@ -8,6 +8,7 @@ import pickle
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
+
 # def __init__(self, 
 #                  entries_file=config.get_fd_file(), 
 #                  slate_number = 1, 
@@ -21,32 +22,16 @@ pd.set_option('display.max_rows', None)
 #                  heavy_weight_stack=False, 
 #                  heavy_weight_p=False, 
 #                  salary_batting_order=5):
-    
-    
         
 s=FDSlate(
-          p_fades = ['tigers'],
-          h_fades = ['pirates', 'indians', 'cardinals'],
+          p_fades = [],
+          h_fades = ['60570-82440', '60570-13520'],
           salary_batting_order=5,
           )
-
-s.active_teams
-
-# for team in s.team_instances:
-#     if team.name in s.active_teams:
-#         team.del_next_game()
-
-
 
 hitters = s.get_hitters()
 pitchers = s.get_pitchers()
 hitter_mlb_ids = hitters[['name', 'mlb_id']]
-
-# p_auto = s.p_lu_df()['lus'].to_dict()
-# stack_auto = s.stacks_df()
-# stack_count = stack_auto['stacks'].nlargest(60)
-# stack_info = stack_auto[['s_z', 'p_z', 'z', 'points', 'salary', 'stacks', 'sp_mu']].sort_values(by='points', ascending=False)
-
 
   # def build_lineups(self, no_secondary = [], info_only = False,
   #                     lus = 150, 
@@ -111,23 +96,21 @@ hitter_mlb_ids = hitters[['name', 'mlb_id']]
 lineups = s.build_lineups(
                       info_only = False,
                       custom_stacks_info = {
- 
- 
- 'dodgers': 0,
- 'astros': 0,
- 'red sox': 0,
- 'royals': 0,
- 'rockies': 0,
- 'mariners': 0,
- 'twins': 0,
- 'tigers': 0,
  'angels': 0,
- 'orioles': 0,
+ 'yankees': 0,
+ 'rays': 0,
+ 'astros': 0,
+ 'cardinals': 0,
+ 'cubs': 0,
+ 'blue jays': 0,
+ 'rockies': 0,
+ 'padres': 0,
+ 'mariners': 0,
+ 'tigers': 0,
  'braves': 0,
- 'reds': 0,
- },
+ 'reds': 0},
                       median_pitcher_salary = None,
-                      low_pitcher_salary = 9500,
+                      low_pitcher_salary = None,
                       high_pitcher_salary = None,
                       max_pitcher_salary = None,
                       median_team_salary = None,
@@ -141,12 +124,12 @@ lineups = s.build_lineups(
                       index_track = 1, 
                       non_random_stack_start=0,
                       
-                      max_lu_total = 60,
+                      max_lu_total = 150,
                       variance = 0, 
                       below_avg_count = 0,
                       below_order_count = 135,
                       risk_limit = 125,
-                      of_count_adjust = 6,
+                      of_count_adjust = 0,
                       max_lu_stack = 50, 
                       
                       
@@ -158,7 +141,7 @@ lineups = s.build_lineups(
                       stack_expand_limit = 20,
                       
                       max_order=7,
-                      non_stack_max_order=4, 
+                      non_stack_max_order=6, 
                      
                       non_stack_quantile = .9, 
                       high_salary_quantile = .9,
@@ -168,21 +151,22 @@ lineups = s.build_lineups(
                       
                       max_sal = 35000,
                       util_replace_filt = 200,
-                      single_stack_surplus = 900,
-                      double_stack_surplus = 900,
+                      single_stack_surplus = 400,
+                      double_stack_surplus = 400,
                       pitcher_surplus = 1,
                       
                       
-                      fill_high_salary_first = False,
+                      fill_high_salary_first = True,
                       select_max_pitcher = True,
-                      no_surplus_secondary_stacks=False,
+                      no_surplus_secondary_stacks=True,
                       find_cheap_stacks = True,
-                      always_pitcher_first=True,
+                      always_pitcher_first=False,
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = True,
                       filter_last_replaced=False,
+                      filter_last_lu = False,
                       always_replace_pitcher_lock=False,
-                      p_sal_stack_filter = True,
+                      p_sal_stack_filter = False,
                       remove_positions = None,
                       
                       exempt=[],
@@ -193,51 +177,43 @@ lineups = s.build_lineups(
                       #position
                       never_replace=[],
                       x_fallback = [],
-                      stack_only = ['rockies', 'twins'],
+                      stack_only = ['mariners', 'tigers'],
                       limit_risk = [],
                       #stacks/h
                       no_combine = [],
                       always_replace_first = [],
                       custom_counts={},
-                      custom_pitchers = {8:75, 10: 75, 19: 0}  ,
+                      custom_pitchers = {4: 75, 10: 75},
                       custom_stacks = {
- 'white sox': 0,
- 'yankees': 10,
- 'phillies': 15,
- 'mets': 15,
- 'rays': 0,
- 'dodgers': 0,
- 'astros': 10,
- 'red sox': 15,
- 'royals': 10,
- 'rockies': 0,
- 'mariners': 15,
- 'twins': 0,
- 'tigers': 15,
+ 'brewers': 10,
+ 'white sox': 10,
  'angels': 10,
- 'orioles': 10,
- 'braves': 15,
- 'reds': 10,
- },
-                      custom_secondary = {
- 
  'yankees': 10,
- 'phillies': 10,
- 'mets': 10,
- 'astros': 10,
- 'red sox': 10,
- 'royals': 10,
+ 'rays': 15,
+ 'astros': 15,
+ 'cardinals': 10,
+ 
+ 'blue jays': 15,
+ 'rockies': 10,
+ 'padres': 15,
  'mariners': 10,
  'tigers': 10,
- 'angels': 10,
- 'orioles': 10,
  'braves': 10,
- 'reds': 10,
+ },
+                      custom_secondary = {
+ 'brewers': 15,
+ 'white sox': 10,
+ 'angels': 15,
+ 'yankees': 15,
+ 'rays': 15,
+ 'astros': 15,
+ 'cardinals': 15,
+ 'blue jays': 15,
+ 'rockies': 10,
+ 'padres': 10,
+ 'braves': 15,
  },
                       )
-
-
-
 
 
 
@@ -271,85 +247,11 @@ lineups = s.build_lineups(
 default_pitcher = s.p_df()['points'].to_dict()
 # # team: stacks to build
 default_stacks = s.default_stack_dict
-all_stacks = s.points_df()[["raw_points", "venue_points", "temp_points", 
-                            "points", "salary", "sp_mu", "raw_talent",
-                            "ump_avg", "venue_avg", "venue_temp"]].sort_values(by='points', ascending=False)
-for team in s.team_instances:
-    if team.ppd and team.name in s.active_teams:
-        filt = all_stacks[(all_stacks.index == team.name) | (all_stacks.index == team.name)].index
-        all_stacks.drop(filt, inplace = True)
+all_stacks = s.points_df()[["raw_points", "points","salary", "sp_mu", "raw_talent",
+                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='mz', ascending=False)
 
-all_stacks['u_z'] = (all_stacks['ump_avg'] - all_stacks['ump_avg'].mean()) / all_stacks['ump_avg'].std()
-all_stacks['v_z'] = (all_stacks['venue_avg'] - all_stacks['venue_avg'].mean()) / all_stacks['venue_avg'].std()
-all_stacks['vt_z'] = (all_stacks['venue_temp'] - all_stacks['venue_temp'].mean()) / all_stacks['venue_temp'].std()
-
-all_stacks['p_z'] = (all_stacks['raw_points'] - all_stacks['raw_points'].mean()) / all_stacks['raw_points'].std()
-all_stacks['s_z'] = ((all_stacks['salary'] - all_stacks['salary'].mean()) / all_stacks['salary'].std()) * -1
-all_stacks['mu_z'] = (all_stacks['sp_mu'] - all_stacks['sp_mu'].mean()) / all_stacks['sp_mu'].std()
-all_stacks['t_z'] = (all_stacks['raw_talent'] - all_stacks['raw_talent'].mean()) / all_stacks['raw_talent'].std()
-all_stacks['z'] = ((all_stacks['p_z'] * 2.5) + (all_stacks['s_z'] * 2) + (all_stacks['mu_z'] * 2) + (all_stacks['t_z'] * 1.25)  + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.25)) / 10
-all_stacks['mz'] = ((all_stacks['p_z'] * 3) + (all_stacks['s_z'] * 0) + (all_stacks['mu_z'] * 2.5) + (all_stacks['t_z'] * 1.75) + (all_stacks['u_z'] * 0) + (all_stacks['v_z'] * 2.75)) / 10
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
-                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav']].sort_values(by='points', ascending=False)
-
-
-for team in s.team_instances:
-    if team.ppd and team.name in s.active_teams:
-        filt = all_pitchers[(all_pitchers['team'] == team.opp_name) | (all_pitchers['team'] == team.name)].index
-        all_pitchers.drop(filt, inplace = True)
-
-
-
-all_pitchers.loc
-
-#################################
-vt_filt = (all_pitchers['venue_temp'] == '')
-all_pitchers.loc[vt_filt, 'venue_temp'] = 72
-all_pitchers['i_z'] = (all_pitchers['exp_inn'] - all_pitchers['exp_inn'].mean()) / all_pitchers['exp_inn'].std()
-all_pitchers['f_z'] = (all_pitchers['fav'] - all_pitchers['fav'].mean()) / all_pitchers['fav'].std()
-all_pitchers['vt_z'] = ((all_pitchers['venue_temp'] - all_pitchers['venue_temp'].mean()) / all_pitchers['venue_temp'].std()) * -1
-all_pitchers['v_z'] = ((all_pitchers['venue_avg'] - all_pitchers['venue_avg'].mean()) / all_pitchers['venue_avg'].std()) * -1
-all_pitchers['u_z'] = ((all_pitchers['ump_avg'] - all_pitchers['ump_avg'].mean()) / all_pitchers['ump_avg'].std()) * -1
-all_pitchers['p_z'] = (all_pitchers['exp_ps_raw'] - all_pitchers['exp_ps_raw'].mean()) / all_pitchers['exp_ps_raw'].std()
-all_pitchers['rmu_z'] = (all_pitchers['raw_mu'] - all_pitchers['raw_mu'].mean()) / all_pitchers['raw_mu'].std()
-all_pitchers['mu_z'] = (all_pitchers['mu'] - all_pitchers['mu'].mean()) / all_pitchers['mu'].std()
-all_pitchers['kp_z'] = (all_pitchers['k_pred'] - all_pitchers['k_pred'].mean()) / all_pitchers['k_pred'].std()
-all_pitchers['rk_z'] = (all_pitchers['k_pred_raw'] - all_pitchers['k_pred_raw'].mean()) / all_pitchers['k_pred_raw'].std()
-all_pitchers['s_z'] = ((all_pitchers['fd_salary'] - all_pitchers['fd_salary'].mean()) / all_pitchers['fd_salary'].std()) * -1
-all_pitchers['pps_z'] = (all_pitchers['pitches_start'] - all_pitchers['pitches_start'].mean()) / all_pitchers['pitches_start'].std()
-all_pitchers['z'] = ((all_pitchers['f_z'] * .5) + (all_pitchers['i_z'] * 1.5) + (all_pitchers['p_z'] * 1.25) + (all_pitchers['rmu_z'] * .75) + (all_pitchers['mu_z'] * 1.5) + (all_pitchers['kp_z'] * 1) + (all_pitchers['rk_z'] * .75) + (all_pitchers['s_z'] * 1) + (all_pitchers['pps_z'] * 0) + (all_pitchers['v_z'] * 1.5) + (all_pitchers['u_z'] * .25)) / 10
-all_pitchers['mz'] = ((all_pitchers['f_z'] * .75) + (all_pitchers['i_z'] * 1.5) + (all_pitchers['p_z'] * 1.5) + (all_pitchers['rmu_z'] * .75) + (all_pitchers['mu_z'] * 1.5) + (all_pitchers['kp_z'] * 1) + (all_pitchers['rk_z'] * .75) + (all_pitchers['s_z'] * 0) + (all_pitchers['pps_z'] * .25) + (all_pitchers['v_z'] * 1.5) + (all_pitchers['u_z'] * .5)) / 10
-
-pitcher_z =  all_pitchers[['name',
-                           'p_z',
-                           'i_z',
-                           'f_z',
-                           'mu_z',
-                           'rmu_z',
-                           'kp_z',
-                           'rk_z',
-                           's_z',
-                           'pps_z',
-                           'u_z',
-                           'v_z',
-                           'vt_z',
-                           'z',
-                           'mz']].sort_values(by='mz', ascending=False).set_index('name')
-stack_z = all_stacks[['p_z',
-                      's_z',
-                      'mu_z',
-                      't_z',
-                      'u_z',
-                      'v_z',
-                      'vt_z',
-                      'z', 
-                      'mz']].sort_values(by='mz', ascending=False)
-
-pitcher_points = all_pitchers[['name','points']].set_index('name')
-pitcher_mz = pitcher_z[['mz', 'z', 'u_z', 'vt_z']]
-pitcher_adj_z = pitcher_z[['z', 'mz']].sort_values(by='z', ascending=False)
-stack_mz = stack_z[['mz', 'z', 'u_z', 'vt_z']].sort_values(by='mz', ascending=False)
-stack_adj_z = stack_z[['z', 'mz', 'u_z', 'vt_z']].sort_values(by='z', ascending=False)
+                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='mz', ascending=False)
 
 
 #get pitcher statcast info for slate
@@ -400,7 +302,7 @@ else:
 pitcher_statcast['speed_last_speed'] = pitcher_statcast['last_speed'] - pitcher_statcast['speed']
 pitcher_statcast
 
-position_sort_key = 'exp_ps_sp_pa'
+position_sort_key = 'points'
 first = s.first_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 second = s.second_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 ss = s.ss_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
@@ -408,11 +310,11 @@ third = s.third_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salar
 of = s.of_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 util = s.util_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 #lookup individual hitter statcast
-player_name = 'altuve'
+player_name = 'yelich'
 hitter_statcast_time = str(tf.fifteen_days)
 hitter_mlb_ids[hitter_mlb_ids['name'].str.lower().str.contains(player_name)]
 
-hitter_plays = get_statcast_h(514888, 2021)
+hitter_plays = get_statcast_h(592885, 2021)
 filtered_hitter_plays = hitter_plays[(hitter_plays['date'] >= hitter_statcast_time)].reset_index()
 filtered_hitter_plays['distance'].count()
 filtered_hitter_plays.describe()
@@ -431,7 +333,5 @@ hc_index = hc_df['t_count'].nlargest(60).index
 pitcher_counts = pc_df.loc[pc_index, ['name', 't_count', 'fd_salary', 'team', 'fd_id','points','pitches_start', 'batters_faced_sp', 'exp_ps_raw']]
 hitter_counts = hc_df.loc[hc_index, ['name', 't_count',  'fd_salary', 'order',  'fd_position', 'fd_id', 'team', 'points', 'fd_wps_pa' ]].set_index('name') 
 
-s.finalize_entries()
-
-{8:75, 10: 75, 19: 0}  
+s.finalize_entries()  
 

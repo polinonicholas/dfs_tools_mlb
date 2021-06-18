@@ -6,7 +6,7 @@ test = game_data[game_data['temp'] == 57]
 
 dejong = game_data[(game_data['home_sp'] == 640464) | (game_data['away_sp'] == 640464)]
 
-p_splits.loc[p_splits['mlb_id'] == 666129, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
+p_splits.loc[p_splits['mlb_id'] == 643615, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
 
 oviado['home_score']
 
@@ -36,6 +36,11 @@ mariners_home['fd_points'].median()
 diamondbacks_home = game_data[game_data['venue_id'] == 15]
 diamondbacks_home['fd_points'].median()
 
+rockies_home = game_data[(game_data['venue_id'] == 19) & (game_data['temp'] > 90)]
+rockies_home['home_runs'].median()
+game_data['home_runs'].mean()
+temp = game_data[(game_data['temp'] > 90)]
+temp['fd_points'].describe()
 
 dodgers_home = game_data[game_data['venue_id'] == 22]
 dodgers_home['fd_points'].median()
