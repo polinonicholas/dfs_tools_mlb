@@ -48,16 +48,15 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
         print(hitters[['name', 'mlb_id', 'fd_wps_pa_vr']])
     return None
     
-t = teams.blue_jays
-o = teams.yankees 
+t = teams.astros
+o = teams.orioles 
 team_notes(t, o, extend = True)
 # t.bullpen[['name', 'status']]
 
-test = t.lineup_df()
-test.columns.tolist()
-
 t.hitter[['name', 'mlb_id']]
 
+t.lineup_df()['sp_mu'].sum()
 
-angels = [457708, 660271, 578428, 665120, 545358, 621493, 594838, 501571, 664058]
-blue_jays = [543760, 666182, 665489, 545341, 624415, 666971, 642133, 669289, 624512]
+brewers = [543939, 596129, 592885, 541645, 541645, 553882, 649966, 598265, 474463]
+
+padres = [502054, 665487, 673490, 592518, 571976, 630105, 673490, 605170, 506433]

@@ -9,20 +9,20 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
 
-# def __init__(self, 
-#                  entries_file=config.get_fd_file(), 
-#                  slate_number = 1, 
-#                  lineups = 150,
-#                  p_fades = [],
-#                  h_fades=[],
-#                  no_stack=[],
-#                  stack_points_weight = 2, 
-#                  stack_threshold = 50, 
-#                  pitcher_threshold = 75,
-#                  heavy_weight_stack=False, 
-#                  heavy_weight_p=False, 
-#                  salary_batting_order=5):
-        
+ # def __init__(self, 
+ #                 entries_file=config.get_fd_file(), 
+ #                 slate_number = 1, 
+ #                 lineups = 150,
+ #                 p_fades = [],
+ #                 h_fades=[],
+ #                 no_stack=[],
+ #                 stack_points_weight = 2, 
+ #                 stack_threshold = 150, 
+ #                 pitcher_threshold = 150,
+ #                 heavy_weight_stack=False, 
+ #                 heavy_weight_p=False,
+ #                 stack_salary_factor = True,
+ #                 salary_batting_order=5):
 s=FDSlate(
           p_fades = [],
           h_fades = [],
@@ -33,7 +33,7 @@ hitters = s.get_hitters()
 pitchers = s.get_pitchers()
 hitter_mlb_ids = hitters[['name', 'mlb_id']]
 
-  # def build_lineups(self, no_secondary = [], info_only = False,
+  # build_lineups(self, no_secondary = [], info_only = False,
   #                     lus = 150, 
   #                     index_track = 0, 
   #                     non_random_stack_start=0,
@@ -92,7 +92,15 @@ hitter_mlb_ids = hitters[['name', 'mlb_id']]
   #                     custom_stacks = None,
   #                     custom_pitchers = None,
   #                     custom_secondary = None,
-  #                     custom_stacks_info = None):
+  #                     custom_stacks_info = None,
+  #                     fill_high_salary_first = False,
+  #                     select_max_pitcher = True,
+  #                     last_lu = [],
+  #                     filter_last_lu = False,
+  #                     select_max_stack = True,
+  #                     select_non_random_stack = False,
+  #                     custom_stack_order = {},
+  #                     expand_pitchers = False):
 lineups = s.build_lineups(
                       info_only = True,
                       custom_stacks_info = None,
@@ -104,8 +112,8 @@ lineups = s.build_lineups(
                       low_stack_salary = None,
                       high_stack_salary = None,
                       max_stack_salary = None,
-                      stack_salary_pairing_cutoff=1,
-                      stack_max_pair = 1,
+                      stack_salary_pairing_cutoff=0,
+                      stack_max_pair = 0,
                       
                       lus = 150, 
                       index_track = 0, 
@@ -125,10 +133,17 @@ lineups = s.build_lineups(
                       
                       
                       fallback_stack_sample = 6,
-                      stack_expand_limit = 20,
+                      stack_expand_limit = 10000,
                       
                       max_order=7,
-                      non_stack_max_order=6, 
+                      non_stack_max_order=6,
+                      #new
+                      first_max_order = 6,
+                      second_max_order = 6,
+                      ss_max_order = 6,
+                      third_max_order = 6,
+                      of_max_order = 6,
+                      util_max_order = 6,
                      
                       non_stack_quantile = .9, 
                       high_salary_quantile = .9,
@@ -137,23 +152,25 @@ lineups = s.build_lineups(
                       no_surplus_cut = 0,
                       
                       max_sal = 35000,
-                      util_replace_filt = 200,
-                      single_stack_surplus = 400,
-                      double_stack_surplus = 400,
-                      pitcher_surplus = 1000,
-                      
-                      
-                      fill_high_salary_first = False,
+                      util_replace_filt = 300,
+                      single_stack_surplus = 900,
+                      double_stack_surplus = 900,
+                      pitcher_surplus = 1,
+                      #new
+                      find_cheap_primary = False
+                      fill_high_salary_first = True,
                       select_max_pitcher = True,
                       no_surplus_secondary_stacks=True,
                       find_cheap_stacks = True,
                       always_pitcher_first=True,
                       enforce_pitcher_surplus = True,
-                      enforce_hitter_surplus = True,
+                      enforce_hitter_surplus = False,
                       filter_last_replaced=False,
                       filter_last_lu = False,
                       always_replace_pitcher_lock=False,
-                      p_sal_stack_filter = True,
+                      p_sal_stack_filter = False,
+                      expand_pitchers = False,
+                      while_loop_secondary = True,
                       remove_positions = None,
                       
                       exempt=[],
@@ -169,10 +186,17 @@ lineups = s.build_lineups(
                       #stacks/h
                       no_combine = [],
                       always_replace_first = [],
+                      #new
+                      no_replace = []
+                      #new
+                      always_find_cheap = [],
                       custom_counts={},
                       custom_pitchers = None,
                       custom_stacks = None,
                       custom_secondary = None,
+                      custom_stack_order = {},
+                      #new
+                      always_pair_first = {}
                       )
 
 
@@ -208,10 +232,10 @@ default_pitcher = s.p_df()['points'].to_dict()
 # # team: stacks to build
 default_stacks = s.default_stack_dict
 all_stacks = s.points_df()[["raw_points", "points","salary", "sp_mu", "raw_talent",
-                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='mz', ascending=False)
+                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='z', ascending=False)
 
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
-                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='mz', ascending=False)
+                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='z', ascending=False)
 
 
 #get pitcher statcast info for slate

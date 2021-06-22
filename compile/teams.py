@@ -824,8 +824,7 @@ class Team(metaclass=IterTeam):
                 p_df['pitches_start'] = self.opp_instance.custom_pps
             key = 'pitches_pa_' + self.o_split
             p_df['exp_x_lu'] = p_df['pitches_start'] / ((h_df[key].sum() + p_ppb) / 2)
-            print(p_df['name'].max())
-            print('!!!!!!!!!!!!!!!!')
+            h_df['sp_exp_x_lu'] = p_df['exp_x_lu'].max()
             print(f"{p_df['name'].max()} expected to go through {self.name} LU {p_df['exp_x_lu'].max()} times. P:{p_ppb} LU: {h_df[key].sum()}")
             p_df['exp_bf'] = round((p_df['exp_x_lu'] * 9))
             sp_rollover = floor((p_df['exp_x_lu'] % 1) * 9)
@@ -843,8 +842,8 @@ class Team(metaclass=IterTeam):
             h_df.loc[righties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2)
             h_df.loc[lefties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vl'].max()  * 1) + (h_df[key] *1)) / 2) * h_df['exp_pa_sp']
             h_df.loc[righties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[lefties, 'sp_mu'] = p_df['fd_wpa_b_vl'].max()
-            h_df.loc[righties, 'sp_mu'] = p_df['fd_wpa_b_vr'].max()
+            h_df.loc[lefties, 'sp_mu'] = (((p_df['fd_wpa_b_vl'].max()  * 1) + (h_df[key] *1)) / 2)
+            h_df.loc[righties, 'sp_mu'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2)
             h_df['sp_split'] = h_df[key]
             h_df['exp_ps_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
             self.lu_talent_sp = h_df['sp_split'].sum() - h_df['sp_split'].std(ddof = 0)
@@ -986,9 +985,9 @@ class Team(metaclass=IterTeam):
         h_df = self.opp_instance.lineup_df()
         p_df['opponent'] = self.opp_instance.name
         p_df['exp_inn'] = h_df['sp_exp_inn'].max()
-        p_df['k_pred'] = h_df['exp_k'].sum() - h_df['exp_k'].std(ddof = 0)
+        p_df['k_pred'] = (h_df['exp_k'].sum() - h_df['exp_k'].std(ddof = 0)) * h_df['sp_exp_x_lu'].max()
         p_df['k_pred_raw'] = h_df['exp_k_sp_raw'].sum() -  h_df['exp_k_sp_raw'].std(ddof = 0)
-        p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() - h_df['exp_pc_sp'].std(ddof = 0)
+        p_df['exp_ps_raw'] = (h_df['exp_pc_sp'].sum() - h_df['exp_pc_sp'].std(ddof = 0)) * h_df['sp_exp_x_lu'].max()
         p_df['mu'] = h_df['exp_pc_sp'].sum() - h_df['exp_pc_sp'].std(ddof = 0)
         p_df['raw_mu'] = h_df['raw_exp_pc_sp'].sum() - h_df['raw_exp_pc_sp'].std(ddof = 0)
         # p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
@@ -1266,10 +1265,13 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        # if self.name == 'rangers' or self.opp_name == 'rangers':
-        #     return 1.05
-        # if len(self.next_venue_data.index) < 100:
-        #     return 1
+        if self.name == 'rangers' or self.opp_name == 'rangers':
+            if self.roof_closed:
+                return 1.025
+            else:
+                return 1.05
+        if len(self.next_venue_data.index) < 100:
+            return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
     
     @cached_property
@@ -1286,6 +1288,11 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean()
+        if self.name == 'rangers' or self.opp_name == 'rangers':
+            if self.roof_closed:
+                return game_data['fd_points'].mean() * 1.025
+            else:
+                return game_data['fd_points'].mean() * 1.05
         return self.next_venue_data['fd_points'].mean()
         
     @cached_property
@@ -1337,20 +1344,28 @@ class Team(metaclass=IterTeam):
     @cached_property
     def env_avg(self):
         temp = self.temp_avg
-        ump = self.ump_avg
+        # ump = self.ump_avg
         venue = self.venue_avg
-        if self.next_has_roof:
-            return (ump + venue) / 2
+        
+        if self.roof_closed:
+            return venue
         else:
-            return (temp + ump + venue) / 3
+            return (temp + venue) / 2
     
     
     def sp_avg(self, return_full_dict = False):
         away = game_data[(game_data['away_sp'] == self.opp_sp['id'])]
         home = game_data[(game_data['home_sp'] == self.opp_sp['id'])]
+        home['away_score'].fillna(game_data['away_score'].mean(), inplace = True)
+        home['away_hits'].fillna(game_data['away_hits'].mean(), inplace = True)
+        away['home_hits'].fillna(game_data['home_hits'].mean(), inplace = True)
+        away['home_score'].fillna(game_data['home_score'].mean(), inplace = True)
+        
+        
         if len(away.index) > 0:
             away_score = away['home_score'].mean()
             away_hits = away['home_hits'].mean()
+            
         else:
             away_score = game_data['home_score'].median()
             away_hits = game_data['home_hits'].median()
@@ -1360,6 +1375,9 @@ class Team(metaclass=IterTeam):
         else:
             home_score = game_data['away_score'].median()
             home_hits = game_data['away_hits'].median()
+            
+             
+            
         
         total_score = (away_score + home_score) / 2
         total_hits = (away_hits + home_hits) / 2
