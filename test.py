@@ -25,9 +25,11 @@ pd.set_option('display.max_rows', None)
  #                 salary_batting_order=5):
 s=FDSlate(
           p_fades = [],
-          h_fades = [],
+          h_fades = ['60896-13858', '60896-13792',
+                     '60896-13253','60896-110911'],
           salary_batting_order=5,
           )
+
 
 hitters = s.get_hitters()
 pitchers = s.get_pitchers()
@@ -102,8 +104,18 @@ hitter_mlb_ids = hitters[['name', 'mlb_id']]
   #                     custom_stack_order = {},
   #                     expand_pitchers = False):
 lineups = s.build_lineups(
-                      info_only = True,
-                      custom_stacks_info = None,
+                      info_only = False,
+                      custom_stacks_info = {'indians': 0,
+ 'blue jays': 0,
+ 'rays': 0,
+ 'astros': 0,
+ 'cardinals': 0,
+ 'red sox': 0,
+ 'twins': 0,
+ 'reds': 0,
+ 'orioles': 0,
+ 'braves': 0,
+ 'pirates': 0},
                       median_pitcher_salary = None,
                       low_pitcher_salary = None,
                       high_pitcher_salary = None,
@@ -129,21 +141,21 @@ lineups = s.build_lineups(
                       
                       
                       stack_size = 4,
-                      stack_sample = 5, 
+                      stack_sample = 4, 
                       
                       
-                      fallback_stack_sample = 6,
+                      fallback_stack_sample = 5,
                       stack_expand_limit = 10000,
                       
-                      max_order=7,
+                      max_order=9,
                       non_stack_max_order=6,
                       #new
-                      first_max_order = 6,
-                      second_max_order = 6,
+                      first_max_order = 4,
+                      second_max_order = 4,
                       ss_max_order = 6,
-                      third_max_order = 6,
-                      of_max_order = 6,
-                      util_max_order = 6,
+                      third_max_order = 5,
+                      of_max_order = 4,
+                      util_max_order = 4,
                      
                       non_stack_quantile = .9, 
                       high_salary_quantile = .9,
@@ -157,7 +169,7 @@ lineups = s.build_lineups(
                       double_stack_surplus = 900,
                       pitcher_surplus = 1,
                       #new
-                      find_cheap_primary = False
+                      find_cheap_primary = False,
                       fill_high_salary_first = True,
                       select_max_pitcher = True,
                       no_surplus_secondary_stacks=True,
@@ -165,21 +177,26 @@ lineups = s.build_lineups(
                       always_pitcher_first=True,
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = False,
-                      filter_last_replaced=False,
-                      filter_last_lu = False,
+                      filter_last_replaced=True,
+                      filter_last_lu = True,
                       always_replace_pitcher_lock=False,
                       p_sal_stack_filter = False,
                       expand_pitchers = False,
                       while_loop_secondary = True,
-                      remove_positions = None,
+                      remove_positions = {'60896-85249':'3b'},
                       
                       exempt=[],
-                      all_in=[],
+                      all_in=['60896-79273', '60896-82654', '60896-38872', '60896-73023', '60896-82575',
+                              '60896-21705'],
                       lock = [],
                       #pitcher
                       no_combos = [],
                       #position
-                      never_replace=[],
+                      never_replace=['60896-38976', '60896-11334',
+                                     '60896-13540', '60896-68585', '60896-37982',
+                                     '60896-52180', '60896-85261', '60896-53401',
+                                     '60896-39151', '60896-12968', '60896-13719',
+                                     '60896-5763'],
                       x_fallback = [],
                       stack_only = [],
                       limit_risk = [],
@@ -187,13 +204,36 @@ lineups = s.build_lineups(
                       no_combine = [],
                       always_replace_first = [],
                       #new
-                      no_replace = []
+                      no_replace = [],
+                      no_secondary_replace = [],
+                      always_replace = ['60896-73832'],
                       #new
                       always_find_cheap = [],
                       custom_counts={},
-                      custom_pitchers = None,
-                      custom_stacks = None,
-                      custom_secondary = None,
+                      custom_pitchers = {8:50, 1: 50, 6:50},
+                      custom_stacks = {'indians': 15,
+ 'blue jays': 15,
+ 'rays': 15,
+ 'astros': 15,
+ 'cardinals': 15,
+ 'red sox': 15,
+ 'twins': 15,
+ 'reds': 15,
+ 'orioles': 15,
+ 'braves': 15,
+ 'tigers':0,
+ 'pirates': 0},
+                      custom_secondary = {'indians': 15,
+ 'blue jays': 15,
+ 'rays': 15,
+ 'astros': 15,
+ 'cardinals': 15,
+ 'red sox': 15,
+ 'twins': 15,
+ 'reds': 15,
+ 'orioles': 15,
+ 'braves': 15,
+ },
                       custom_stack_order = {},
                       #new
                       always_pair_first = {}
@@ -201,27 +241,6 @@ lineups = s.build_lineups(
 
 
 
-# remove_positions  = {
-#                           '':'1b',
-#                           '':'1b',
-#                           '':'3b',
-#                           '':'of',
-#                           '':'3b',
-#                           '':'3b',
-#                           '':'1b',
-#                           '':'3b',
-#                           '':'ss',
-#                           '':'3b',
-#                           '':'3b',
-#                           '':'1b',
-#                           '':'1b',
-#                           '':'1b',
-#                           '':'1b',
-#                           '':'1b',
-#                           '':'1b',
-#                           '':'2b',
-#                           '':'1b',
-#                           }
 
 
    
@@ -232,7 +251,7 @@ default_pitcher = s.p_df()['points'].to_dict()
 # # team: stacks to build
 default_stacks = s.default_stack_dict
 all_stacks = s.points_df()[["raw_points", "points","salary", "sp_mu", "raw_talent",
-                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='z', ascending=False)
+                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='mz', ascending=False)
 
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
                          'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='z', ascending=False)
@@ -294,11 +313,11 @@ third = s.third_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salar
 of = s.of_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 util = s.util_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 #lookup individual hitter statcast
-player_name = 'brinson'
+player_name = 'gric'
 hitter_statcast_time = str(tf.fifteen_days)
 hitter_mlb_ids[hitter_mlb_ids['name'].str.lower().str.contains(player_name)]
 
-hitter_plays = get_statcast_h(621446, 2021)
+hitter_plays = get_statcast_h(545341, 2021)
 filtered_hitter_plays = hitter_plays[(hitter_plays['date'] >= hitter_statcast_time)].reset_index()
 filtered_hitter_plays['distance'].count()
 filtered_hitter_plays.describe()

@@ -1,12 +1,19 @@
 from dfs_tools_mlb.dataframes.game_data import game_data
 from dfs_tools_mlb.dataframes.stat_splits import p_splits
-game_data.columns.tolist()
+from dfs_tools_mlb.dataframes.stat_splits import h_splits
+
+h_splits.columns.tolist()
+p_splits.columns.tolist()
+h_splits.loc[h_splits['hr'].idxmax()]
+
+p_splits.loc[[205, 202, 184, 196, 137], 'name']
+
 
 test = game_data[game_data['temp'] == 57]
 
 dejong = game_data[(game_data['home_sp'] == 640464) | (game_data['away_sp'] == 640464)]
 
-p_splits.loc[p_splits['mlb_id'] == 640470, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
+p_splits.loc[p_splits['mlb_id'] == 663574, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
 
 oviado['home_score']
 

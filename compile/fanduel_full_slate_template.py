@@ -157,7 +157,7 @@ lineups = s.build_lineups(
                       double_stack_surplus = 900,
                       pitcher_surplus = 1,
                       #new
-                      find_cheap_primary = False
+                      find_cheap_primary = False,
                       fill_high_salary_first = True,
                       select_max_pitcher = True,
                       no_surplus_secondary_stacks=True,
@@ -187,7 +187,9 @@ lineups = s.build_lineups(
                       no_combine = [],
                       always_replace_first = [],
                       #new
-                      no_replace = []
+                      no_replace = [],
+                      no_secondary_replace = [],
+                      always_replace = [],
                       #new
                       always_find_cheap = [],
                       custom_counts={},

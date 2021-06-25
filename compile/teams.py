@@ -779,7 +779,10 @@ class Team(metaclass=IterTeam):
             h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_wpa_pa_vr'].isna())) & lefties & not_pitcher_filt, 'fd_wpa_pa_vr'] = h_l_vr['fd_wpa_pa_vr'].median()
             h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_wpa_pa_vl'].isna())) & righties & not_pitcher_filt, 'fd_wpa_pa_vl'] = h_r_vl['fd_wpa_pa_vl'].median()
             
-            
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_hr_weight_vr'].isna())) & righties & not_pitcher_filt, 'fd_hr_weight_vr'] = h_r_vr['fd_hr_weight_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_hr_weight_vl'].isna())) & lefties & not_pitcher_filt, 'fd_hr_weight_vl'] = h_l_vl['fd_hr_weight_vl'].median()
+            h_df.loc[((h_df['pa_vr'] < 25) | (h_df['fd_hr_weight_vr'].isna())) & lefties & not_pitcher_filt, 'fd_hr_weight_vr'] = h_l_vr['fd_hr_weight_vr'].median()
+            h_df.loc[((h_df['pa_vl'] < 25) | (h_df['fd_hr_weight_vl'].isna())) & righties & not_pitcher_filt, 'fd_hr_weight_vl'] = h_r_vl['fd_hr_weight_vl'].median()
             
             
             try:
@@ -842,8 +845,8 @@ class Team(metaclass=IterTeam):
             h_df.loc[righties, 'exp_ps_sp_pa'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2)
             h_df.loc[lefties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vl'].max()  * 1) + (h_df[key] *1)) / 2) * h_df['exp_pa_sp']
             h_df.loc[righties, 'exp_ps_sp'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[lefties, 'sp_mu'] = (((p_df['fd_wpa_b_vl'].max()  * 1) + (h_df[key] *1)) / 2)
-            h_df.loc[righties, 'sp_mu'] = (((p_df['fd_wpa_b_vr'].max()  * 1) + (h_df[key] *1)) / 2)
+            h_df.loc[lefties, 'sp_mu'] = (((p_df['fd_wpa_b_vl'].max()  * 2) + (h_df[key] * 0)) / 2)
+            h_df.loc[righties, 'sp_mu'] = (((p_df['fd_wpa_b_vr'].max()  * 2) + (h_df[key] * 0)) / 2)
             h_df['sp_split'] = h_df[key]
             h_df['exp_ps_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
             self.lu_talent_sp = h_df['sp_split'].sum() - h_df['sp_split'].std(ddof = 0)
@@ -1270,14 +1273,19 @@ class Team(metaclass=IterTeam):
                 return 1.025
             else:
                 return 1.05
-        if len(self.next_venue_data.index) < 100:
-            return 1
+        # if len(self.next_venue_data.index) < 100:
+        #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
     
     @cached_property
     def venue_avg(self):
+        #rangers ballpark skewed
         if self.next_venue == 5325:
-            return game_data['fd_points'].mean() * 1.1
+            if not self.roof_closed:
+                return game_data['fd_points'].mean() * 1.075
+            else:
+                return game_data['fd_points'].mean() * 1.025
+                
         if (self.wind_direction in mac.weather.wind_out or self.wind_direction in mac.weather.wind_in) and not self.roof_closed:
             wind_in = self.next_venue_data[self.next_venue_data['wind_direction'].isin(mac.weather.wind_in)]
             wind_out = self.next_venue_data[self.next_venue_data['wind_direction'].isin(mac.weather.wind_out)]
@@ -1288,11 +1296,7 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean()
-        if self.name == 'rangers' or self.opp_name == 'rangers':
-            if self.roof_closed:
-                return game_data['fd_points'].mean() * 1.025
-            else:
-                return game_data['fd_points'].mean() * 1.05
+        
         return self.next_venue_data['fd_points'].mean()
         
     @cached_property
@@ -1356,29 +1360,35 @@ class Team(metaclass=IterTeam):
     def sp_avg(self, return_full_dict = False):
         away = game_data[(game_data['away_sp'] == self.opp_sp['id'])]
         home = game_data[(game_data['home_sp'] == self.opp_sp['id'])]
-        home['away_score'].fillna(game_data['away_score'].mean(), inplace = True)
-        home['away_hits'].fillna(game_data['away_hits'].mean(), inplace = True)
-        away['home_hits'].fillna(game_data['home_hits'].mean(), inplace = True)
-        away['home_score'].fillna(game_data['home_score'].mean(), inplace = True)
+        
+        
+        # home['away_score'].fillna(game_data['away_score'].mean(), inplace = True)
+        # home['away_hits'].fillna(game_data['away_hits'].mean(), inplace = True)
+        # away['home_hits'].fillna(game_data['home_hits'].mean(), inplace = True)
+        # away['home_score'].fillna(game_data['home_score'].mean(), inplace = True)
         
         
         if len(away.index) > 0:
             away_score = away['home_score'].mean()
             away_hits = away['home_hits'].mean()
-            
+            if np.isnan(away_score):
+                away_score = game_data['home_score'].median()
+            if np.isnan(away_hits):
+                away_hits = game_data['home_hits'].median()
         else:
             away_score = game_data['home_score'].median()
             away_hits = game_data['home_hits'].median()
         if len(home.index) > 0:
             home_score = home['away_score'].mean()
             home_hits = home['away_hits'].mean()
+            if np.isnan(home_score):
+                home_score = game_data['away_score'].median()
+            if np.isnan(home_hits):
+               home_hits = game_data['away_hits'].median()
         else:
             home_score = game_data['away_score'].median()
             home_hits = game_data['away_hits'].median()
             
-             
-            
-        
         total_score = (away_score + home_score) / 2
         total_hits = (away_hits + home_hits) / 2
         home_fd_points = (home_score * 6.7) + (home_hits * 3)
@@ -1419,6 +1429,9 @@ class Team(metaclass=IterTeam):
         if len(bp.index) < 4:
             bp = self.opp_instance.bullpen
             bp = bp[(bp['status'] == 'A')]
+            bp['fd_wpa_b_rp'] = bp['fd_wpa_b_rp'] * 1.075
+            bp['fd_wpa_b_vr'] = bp['fd_wpa_b_vr'] * 1.075
+            bp['fd_wpa_b_vl'] = bp['fd_wpa_b_vl'] * 1.075
         with open(file, "wb") as f:
             pickle.dump(bp, f)
         return bp
@@ -1530,4 +1543,3 @@ royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals')
 mets = Team(mlb_id = 121, name = 'mets')
-
