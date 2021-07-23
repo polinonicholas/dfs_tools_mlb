@@ -13,6 +13,7 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
     pitchers = opponent.pitcher
     pitcher = pitchers[pitchers['name'].str.contains(p_name)]
     print('START')
+    print(team.lineup_df()[['name', 'mlb_id']])
     print(t.weather)
     print(pitcher[['name','fd_wps_b_vr', 'fd_wps_b_vl', 'batters_faced_vl', 'pitches_start']])
     print(t.sp_avg(return_full_dict=True))
@@ -48,18 +49,12 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
         print(hitters[['name', 'mlb_id', 'fd_wps_pa_vr']])
     return None
     
-t = teams.orioles
-o = teams.blue_jays 
-team_notes(t, o, extend = False)
+t = teams.twins
+o = teams.angels
+team_notes(t, o, extend = True)
 # t.bullpen[['name', 'status']]
 
-t.hitter[['name', 'mlb_id']]
+o.bullpen[['name', 'pitch_hand', 'fd_wpa_b_rp', 'games_21', 'batters_faced_rp', 'status']].sort_values(by='games_21')
+o.bullpen.columns.tolist()
 
-t.lineup_df()['sp_mu'].sum()
-
-
-
-
-
-twins = [650333, 518626, 663616, 443558, 596146, 593871, 666135, 680777, 592743]
-, custom_lineup = [650333, 518626, 663616, 443558, 596146, 593871, 666135, 666163, 592743]
+[593871, 596146, 443558, 518626, 593934, 663616, 680777, 665482, 592743]

@@ -8,114 +8,20 @@ import pickle
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
-
- # def __init__(self, 
- #                 entries_file=config.get_fd_file(), 
- #                 slate_number = 1, 
- #                 lineups = 150,
- #                 p_fades = [],
- #                 h_fades=[],
- #                 no_stack=[],
- #                 stack_points_weight = 2, 
- #                 stack_threshold = 150, 
- #                 pitcher_threshold = 150,
- #                 heavy_weight_stack=False, 
- #                 heavy_weight_p=False,
- #                 stack_salary_factor = True,
- #                 salary_batting_order=5):
 s=FDSlate(
           p_fades = [],
-          h_fades = ['60896-13858', '60896-13792',
-                     '60896-13253','60896-110911'],
+          h_fades = [],
           salary_batting_order=5,
           )
-
 
 hitters = s.get_hitters()
 pitchers = s.get_pitchers()
 hitter_mlb_ids = hitters[['name', 'mlb_id']]
 
-  # build_lineups(self, no_secondary = [], info_only = False,
-  #                     lus = 150, 
-  #                     index_track = 0, 
-  #                     non_random_stack_start=0,
-  #                     max_lu_total = 150,
-  #                     variance = 0, 
-  #                     below_avg_count = 0,
-  #                     below_order_count = 135,
-  #                     risk_limit = 125,
-  #                     of_count_adjust = 0,
-  #                     max_lu_stack = 50, 
-  #                     max_sal = 35000, 
-  #                     stack_size = 4,
-  #                     stack_sample = 5, 
-  #                     stack_salary_pairing_cutoff=0,
-  #                     stack_max_pair = 5,
-  #                     fallback_stack_sample = 6,
-  #                     stack_expand_limit = 20,
-  #                     max_order=7,
-  #                     non_stack_max_order=6, 
-  #                     util_replace_filt = 200,
-  #                     non_stack_quantile = .9, 
-  #                     high_salary_quantile = .9,
-  #                     secondary_stack_cut = 0,
-  #                     no_surplus_cut = 0,
-  #                     single_stack_surplus = 400,
-  #                     double_stack_surplus = 400,
-  #                     pitcher_surplus = 1000,
-  #                     median_pitcher_salary = None,
-  #                     low_pitcher_salary = None,
-  #                     high_pitcher_salary = None,
-  #                     max_pitcher_salary = None,
-  #                     median_team_salary = None,
-  #                     low_stack_salary = None,
-  #                     high_stack_salary = None,
-  #                     max_stack_salary = None,
-  #                     no_surplus_secondary_stacks=True,
-  #                     find_cheap_stacks = True,
-  #                     always_pitcher_first=True,
-  #                     enforce_pitcher_surplus = True,
-  #                     enforce_hitter_surplus = True,
-  #                     filter_last_replaced=True,
-  #                     always_replace_pitcher_lock=False,
-  #                     p_sal_stack_filter = True,
-  #                     exempt=[],
-  #                     all_in=[],
-  #                     lock = [],
-  #                     no_combos = [],
-  #                     never_replace=[],
-  #                     x_fallback = [],
-  #                     stack_only = [],
-  #                     limit_risk = [],
-  #                     no_combine = [],
-  #                     always_replace_first = [],
-  #                     custom_counts={},
-  #                     remove_positions = None,
-  #                     custom_stacks = None,
-  #                     custom_pitchers = None,
-  #                     custom_secondary = None,
-  #                     custom_stacks_info = None,
-  #                     fill_high_salary_first = False,
-  #                     select_max_pitcher = True,
-  #                     last_lu = [],
-  #                     filter_last_lu = False,
-  #                     select_max_stack = True,
-  #                     select_non_random_stack = False,
-  #                     custom_stack_order = {},
-  #                     expand_pitchers = False):
+
 lineups = s.build_lineups(
-                      info_only = False,
-                      custom_stacks_info = {'indians': 0,
- 'blue jays': 0,
- 'rays': 0,
- 'astros': 0,
- 'cardinals': 0,
- 'red sox': 0,
- 'twins': 0,
- 'reds': 0,
- 'orioles': 0,
- 'braves': 0,
- 'pirates': 0},
+                      info_only = True,
+                      custom_stacks_info = None,
                       median_pitcher_salary = None,
                       low_pitcher_salary = None,
                       high_pitcher_salary = None,
@@ -126,6 +32,7 @@ lineups = s.build_lineups(
                       max_stack_salary = None,
                       stack_salary_pairing_cutoff=0,
                       stack_max_pair = 0,
+                      
                       
                       lus = 150, 
                       index_track = 0, 
@@ -148,14 +55,16 @@ lineups = s.build_lineups(
                       stack_expand_limit = 10000,
                       
                       max_order=9,
-                      non_stack_max_order=6,
+                      non_stack_max_order=7,
+                      
                       #new
                       first_max_order = 4,
-                      second_max_order = 4,
-                      ss_max_order = 6,
+                      second_max_order = 7,
+                      ss_max_order = 7,
                       third_max_order = 5,
                       of_max_order = 4,
                       util_max_order = 4,
+                      min_avg_post_stack = 2700,
                      
                       non_stack_quantile = .9, 
                       high_salary_quantile = .9,
@@ -165,10 +74,15 @@ lineups = s.build_lineups(
                       
                       max_sal = 35000,
                       util_replace_filt = 300,
+                      all_in_replace_filt = 300,
+                      all_in_replace_order_stack = 6,
+                      all_in_replace_order_sec = 5,
                       single_stack_surplus = 900,
                       double_stack_surplus = 900,
                       pitcher_surplus = 1,
                       #new
+                      replace_secondary_all_in = True,
+                      replace_primary_all_in= True,
                       find_cheap_primary = False,
                       fill_high_salary_first = True,
                       select_max_pitcher = True,
@@ -177,70 +91,83 @@ lineups = s.build_lineups(
                       always_pitcher_first=True,
                       enforce_pitcher_surplus = True,
                       enforce_hitter_surplus = False,
-                      filter_last_replaced=True,
-                      filter_last_lu = True,
-                      always_replace_pitcher_lock=False,
+                      filter_last_replaced=False,
+                      filter_last_lu = False,
+                      always_replace_pitcher_lock=True,
                       p_sal_stack_filter = False,
                       expand_pitchers = False,
                       while_loop_secondary = True,
-                      remove_positions = {'60896-85249':'3b'},
+                      remove_positions = None,
                       
                       exempt=[],
-                      all_in=['60896-79273', '60896-82654', '60896-38872', '60896-73023', '60896-82575',
-                              '60896-21705'],
-                      lock = [],
+                      all_in=[],
+                      supreme_all_in=None,
+                      supreme_all_in_pos = [],
+                      no_supreme_replace = [],
+                      never_replace=[],
+                      #avoid replacing stacked players with all ins.
+                      never_replace_secondary=[],
+                      never_replace_primary=[],
+                      no_utility=[],
+                      stack_only = [],
+                      always_replace = [],
                       #pitcher
                       no_combos = [],
                       #position
-                      never_replace=['60896-38976', '60896-11334',
-                                     '60896-13540', '60896-68585', '60896-37982',
-                                     '60896-52180', '60896-85261', '60896-53401',
-                                     '60896-39151', '60896-12968', '60896-13719',
-                                     '60896-5763'],
+                     
                       x_fallback = [],
-                      stack_only = [],
                       limit_risk = [],
+                      lock = [],
                       #stacks/h
                       no_combine = [],
                       always_replace_first = [],
                       #new
                       no_replace = [],
+                      #for increasing stacks order/salary
                       no_secondary_replace = [],
-                      always_replace = ['60896-73832'],
+                      no_stack_replace = [],
+                      
+                      never_fill = [],
                       #new
                       always_find_cheap = [],
                       custom_counts={},
-                      custom_pitchers = {8:50, 1: 50, 6:50},
-                      custom_stacks = {'indians': 15,
- 'blue jays': 15,
- 'rays': 15,
- 'astros': 15,
- 'cardinals': 15,
- 'red sox': 15,
- 'twins': 15,
- 'reds': 15,
- 'orioles': 15,
- 'braves': 15,
- 'tigers':0,
- 'pirates': 0},
-                      custom_secondary = {'indians': 15,
- 'blue jays': 15,
- 'rays': 15,
- 'astros': 15,
- 'cardinals': 15,
- 'red sox': 15,
- 'twins': 15,
- 'reds': 15,
- 'orioles': 15,
- 'braves': 15,
- },
+                      custom_pitchers = None,
+                      custom_stacks = None,
+                      custom_secondary = None,
+                      locked_lineup = None,
                       custom_stack_order = {},
                       #new
-                      always_pair_first = {}
+                      always_pair_first = {},
+                      info_stack_key = 'exp_ps_sp_pa',
+                      stack_info_order = 5,
+                      stack_info_size = 4,
+                      stack_info_salary_factor=False,
+                      stack_top_order=True
                       )
 
 
 
+# remove_positions  = {
+#                           '':'1b',
+#                           '':'1b',
+#                           '':'3b',
+#                           '':'of',
+#                           '':'3b',
+#                           '':'3b',
+#                           '':'1b',
+#                           '':'3b',
+#                           '':'ss',
+#                           '':'3b',
+#                           '':'3b',
+#                           '':'1b',
+#                           '':'1b',
+#                           '':'1b',
+#                           '':'1b',
+#                           '':'1b',
+#                           '':'1b',
+#                           '':'2b',
+#                           '':'1b',
+#                           }
 
 
    
@@ -251,10 +178,10 @@ default_pitcher = s.p_df()['points'].to_dict()
 # # team: stacks to build
 default_stacks = s.default_stack_dict
 all_stacks = s.points_df()[["raw_points", "points","salary", "sp_mu", "raw_talent",
-                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='mz', ascending=False)
+                            "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='z', ascending=False)
 
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
-                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='z', ascending=False)
+                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='k_pred', ascending=False)
 
 
 #get pitcher statcast info for slate
@@ -313,11 +240,11 @@ third = s.third_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salar
 of = s.of_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 util = s.util_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 #lookup individual hitter statcast
-player_name = 'gric'
+player_name = 'brinson'
 hitter_statcast_time = str(tf.fifteen_days)
 hitter_mlb_ids[hitter_mlb_ids['name'].str.lower().str.contains(player_name)]
 
-hitter_plays = get_statcast_h(545341, 2021)
+hitter_plays = get_statcast_h(621446, 2021)
 filtered_hitter_plays = hitter_plays[(hitter_plays['date'] >= hitter_statcast_time)].reset_index()
 filtered_hitter_plays['distance'].count()
 filtered_hitter_plays.describe()

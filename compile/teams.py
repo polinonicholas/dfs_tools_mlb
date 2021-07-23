@@ -36,11 +36,11 @@ from dfs_tools_mlb.dataframes.stat_splits import (h_splits, p_splits, h_q, h_q_v
 class IterTeam(type):
     def __iter__(cls):
         return iter(cls._all_teams)
-    
+
 class Team(metaclass=IterTeam):
     _all_teams = []
     def __init__(self, mlb_id, name='', custom_lineup=None, custom_sp=None, ppd=False,
-                 custom_pps=None, custom_temp = None):
+                 custom_pps=None, custom_temp = None, custom_wind_direction = None, custom_wind_speed = None):
         self._all_teams.append(self)
         self.id = mlb_id
         self.name = name
@@ -49,6 +49,8 @@ class Team(metaclass=IterTeam):
         self.ppd = ppd
         self.custom_pps = custom_pps
         self.custom_temp = custom_temp
+        self.custom_wind_direction = custom_wind_direction
+        self.custom_wind_speed = custom_wind_speed
     @cached_property
     def depth(self):
         file = pickle_path(name=f"{self.name}_depth_{tf.today}", directory=settings.DEPTH_DIR)
@@ -928,7 +930,7 @@ class Team(metaclass=IterTeam):
             self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
             self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
             self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
-            h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
+            # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
             h_df['venue_points'] = (h_df['exp_ps_raw'] * self.next_venue_boost) - h_df['exp_ps_raw']
             h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
             h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
@@ -942,7 +944,7 @@ class Team(metaclass=IterTeam):
             h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
             h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
             h_df['points'] = h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points'] + h_df['exp_ps_raw']
-            h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
+            # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
             self.raw_points = h_df['exp_ps_raw'].sum()
             self.venue_points = (self.raw_points * self.next_venue_boost) - self.raw_points
             self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
@@ -950,7 +952,7 @@ class Team(metaclass=IterTeam):
             self.points = self.venue_points + self.temp_points + self.ump_points + self.raw_points
             self.sp_mu = h_df['sp_mu'].sum()
             self.lu_talent_sp = h_df['sp_split'].sum() - h_df['sp_split'].std(ddof = 0)
-            h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
+            # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
         return h_df
     def sp_df(self):
         daily_info = Team.daily_info()
@@ -1151,6 +1153,8 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def wind_speed(self):
+        if self.custom_wind_speed:
+            return self.custom_wind_speed
         if self.roof_closed:
             return 0
         elif not self.next_has_roof:
@@ -1177,6 +1181,8 @@ class Team(metaclass=IterTeam):
                 
     @cached_property
     def wind_direction(self):
+        if self.custom_wind_direction:
+            return self.custom_wind_direction
         wind_direction = ''
         if self.weather:
             wind_description = self.weather.get('wind')
@@ -1268,11 +1274,11 @@ class Team(metaclass=IterTeam):
                             return wind_out['fd_points'].mean() / game_data['fd_points'].mean()
                         if self.wind_direction in mac.weather.wind_in:
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
-        if self.name == 'rangers' or self.opp_name == 'rangers':
+        if self.next_venue == 5325:
             if self.roof_closed:
                 return 1.025
             else:
-                return 1.05
+                return 1.075
         # if len(self.next_venue_data.index) < 100:
         #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1350,11 +1356,13 @@ class Team(metaclass=IterTeam):
         temp = self.temp_avg
         # ump = self.ump_avg
         venue = self.venue_avg
-        
         if self.roof_closed:
-            return venue
-        else:
-            return (temp + venue) / 2
+            sample = game_data[game_data['condition'].isin(mac.weather.roof_closed)]
+            temp = sample['fd_points'].mean()
+        # if self.roof_closed:
+        #     return venue
+        
+        return (temp + venue) / 2
     
     
     def sp_avg(self, return_full_dict = False):
@@ -1541,5 +1549,7 @@ tigers = Team(mlb_id = 116, name = 'tigers')
 astros = Team(mlb_id = 117, name = 'astros')
 royals = Team(mlb_id = 118, name = 'royals')
 dodgers = Team(mlb_id = 119, name = 'dodgers')
-nationals = Team(mlb_id = 120, name = 'nationals')
+nationals = Team(mlb_id = 120, name = 'nationals') 
 mets = Team(mlb_id = 121, name = 'mets')
+#'Out To CF'
+
