@@ -3,6 +3,7 @@ from dfs_tools_mlb.utils.subclass import Map
 
 time_frames = Map({'today': datetime.date.today(),
                    'tomorrow': datetime.date.today() + datetime.timedelta(days=1),
+                   'seven_days': datetime.date.today() - datetime.timedelta(days=7),
                    'yesterday': datetime.date.today() - datetime.timedelta(days=1),
                    'thirty_days': datetime.date.today() - datetime.timedelta(days=30),
                    'one_year': datetime.date.today() - datetime.timedelta(days=365),

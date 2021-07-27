@@ -13,7 +13,7 @@ test = game_data[game_data['temp'] == 57]
 
 dejong = game_data[(game_data['home_sp'] == 664045) | (game_data['away_sp'] == 640464)]
 
-p_splits.loc[p_splits['mlb_id'] == 628317, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
+p_splits.loc[p_splits['mlb_id'] == 640444, ['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']]
 
 oviado['home_score']
 
@@ -33,7 +33,7 @@ wood = game_data[(game_data['away_sp'] == 622072)]
 bassit = game_data[(game_data['home_sp'] == 605135)]
 
 
-white_sox_home = game_data[game_data['venue_id'] == 4]
+white_sox_home = game_data[game_data['venue_id'] == 3289]
 white_sox_home['fd_points'].median()
 
 
@@ -43,16 +43,20 @@ mariners_home['fd_points'].median()
 diamondbacks_home = game_data[game_data['venue_id'] == 15]
 diamondbacks_home['fd_points'].median()
 
-rockies_home = game_data[(game_data['venue_id'] == 19) & (game_data['temp'] > 90)]
-rockies_home['home_runs'].median()
+rockies_home = game_data[(game_data['venue_id'] == 2681) & (game_data['temp'] > 80) & (game_data['temp'] < 90)]
+rockies_home['home_runs'].mean()
 game_data['home_runs'].mean()
 temp = game_data[(game_data['temp'] > 90)]
 temp['fd_points'].describe()
 game_data.columns.tolist()
-dodgers_home = game_data[(game_data['venue_id'] == 17) & (game_data['wind_speed'] > 10) & (game_data['wind_direction'].str.contains("Out")) & (game_data['temp'] > 80)]
+
+
+
+
+dodgers_home = game_data[(game_data['venue_id'] == 7) & (game_data['wind_speed'] > 10) & (game_data['wind_direction'].str.contains("Out")) & (game_data['temp'] > 80)]
 dodgers_home['fd_points'].median()
 
-athletics_home = game_data[game_data['venue_id'] == 10]
+athletics_home = game_data[game_data['venue_id'] == 2392]
 athletics_home['fd_points'].median()
 
  p_ppb = ((.5 * 4) + (.5 * 4)) * 9 

@@ -15,7 +15,7 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
     print('START')
     print(team.lineup_df()[['name', 'mlb_id']])
     print(t.weather)
-    print(pitcher[['name','fd_wps_b_vr', 'fd_wps_b_vl', 'batters_faced_vl', 'pitches_start']])
+    print(pitcher[['name','fd_wps_b_vr', 'fd_wps_b_vl', 'batters_faced_vl', 'pitches_start', 'mlb_id']])
     print(t.sp_avg(return_full_dict=True))
     if p_hand == 'R':
         print(team.lineup_df()[['name', 'fd_wpa_pa_vr', 'pa_vr', 'fd_hr_weight_vr', 'bat_side']])
@@ -49,12 +49,12 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
         print(hitters[['name', 'mlb_id', 'fd_wps_pa_vr']])
     return None
     
-t = teams.twins
-o = teams.angels
-team_notes(t, o, extend = True)
+t = teams.mariners
+o = teams.astros
+team_notes(t, o, extend = False)
 # t.bullpen[['name', 'status']]
 
 o.bullpen[['name', 'pitch_hand', 'fd_wpa_b_rp', 'games_21', 'batters_faced_rp', 'status']].sort_values(by='games_21')
 o.bullpen.columns.tolist()
 
-[593871, 596146, 443558, 518626, 593934, 663616, 680777, 665482, 592743]
+

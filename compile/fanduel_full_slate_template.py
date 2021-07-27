@@ -58,12 +58,12 @@ lineups = s.build_lineups(
                       non_stack_max_order=7,
                       
                       #new
-                      first_max_order = 4,
+                      first_max_order = 5,
                       second_max_order = 7,
                       ss_max_order = 7,
                       third_max_order = 5,
-                      of_max_order = 4,
-                      util_max_order = 4,
+                      of_max_order = 5,
+                      util_max_order = 5,
                       min_avg_post_stack = 2700,
                      
                       non_stack_quantile = .9, 
@@ -75,14 +75,15 @@ lineups = s.build_lineups(
                       max_sal = 35000,
                       util_replace_filt = 300,
                       all_in_replace_filt = 300,
-                      all_in_replace_order_stack = 6,
+                      all_in_replace_order_stack = 5,
                       all_in_replace_order_sec = 5,
                       single_stack_surplus = 900,
                       double_stack_surplus = 900,
                       pitcher_surplus = 1,
                       #new
                       replace_secondary_all_in = True,
-                      replace_primary_all_in= True,
+                      replace_primary_all_in= False,
+                      never_replace_primary_supreme = True,
                       find_cheap_primary = False,
                       fill_high_salary_first = True,
                       select_max_pitcher = True,
@@ -105,9 +106,13 @@ lineups = s.build_lineups(
                       supreme_all_in_pos = [],
                       no_supreme_replace = [],
                       never_replace=[],
+                      no_stack_salary_decrease=[],
                       #avoid replacing stacked players with all ins.
                       never_replace_secondary=[],
                       never_replace_primary=[],
+                      #for increasing stacks order/salary
+                      no_secondary_replace = [],
+                      no_stack_replace = [],
                       no_utility=[],
                       stack_only = [],
                       always_replace = [],
@@ -123,10 +128,6 @@ lineups = s.build_lineups(
                       always_replace_first = [],
                       #new
                       no_replace = [],
-                      #for increasing stacks order/salary
-                      no_secondary_replace = [],
-                      no_stack_replace = [],
-                      
                       never_fill = [],
                       #new
                       always_find_cheap = [],
@@ -138,6 +139,7 @@ lineups = s.build_lineups(
                       custom_stack_order = {},
                       #new
                       always_pair_first = {},
+                      never_pair = {},
                       info_stack_key = 'exp_ps_sp_pa',
                       stack_info_order = 5,
                       stack_info_size = 4,
