@@ -1276,9 +1276,9 @@ class Team(metaclass=IterTeam):
                             return wind_in['fd_points'].mean() / game_data['fd_points'].mean()
         if self.next_venue == 5325:
             if self.roof_closed:
-                return 1.025
+                return 1
             else:
-                return 1.075
+                return 1
         # if len(self.next_venue_data.index) < 100:
         #     return 1
         return self.next_venue_data['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1288,9 +1288,9 @@ class Team(metaclass=IterTeam):
         #rangers ballpark skewed
         if self.next_venue == 5325:
             if not self.roof_closed:
-                return game_data['fd_points'].mean() * 1.075
+                return game_data['fd_points'].mean() * 1
             else:
-                return game_data['fd_points'].mean() * 1.025
+                return game_data['fd_points'].mean() * 1
                 
         if (self.wind_direction in mac.weather.wind_out or self.wind_direction in mac.weather.wind_in) and not self.roof_closed:
             wind_in = self.next_venue_data[self.next_venue_data['wind_direction'].isin(mac.weather.wind_in)]
@@ -1525,7 +1525,7 @@ athletics = Team(mlb_id = 133, name = 'athletics')
 pirates = Team(mlb_id = 134, name = 'pirates')
 padres = Team(mlb_id = 135, name = 'padres')
 mariners = Team(mlb_id = 136, name = 'mariners')
-giants = Team(mlb_id = 137, name = 'giants')
+giants = Team(mlb_id = 137, name = 'giants', custom_lineup =[664774, 592178, 573262, 457763, 543105, 543063, 527038, 621453, 592332])
 cardinals = Team(mlb_id = 138, name = 'cardinals')
 rays = Team(mlb_id = 139, name = 'rays')
 rangers = Team(mlb_id = 140, name = 'rangers')
@@ -1552,4 +1552,5 @@ dodgers = Team(mlb_id = 119, name = 'dodgers')
 nationals = Team(mlb_id = 120, name = 'nationals') 
 mets = Team(mlb_id = 121, name = 'mets')
 #'Out To CF'
+
 

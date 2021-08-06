@@ -9,7 +9,6 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
     if not p_hand:
         p_hand = team.opp_sp_hand
     hitters = team.hitter
-    lu = team.lineup
     pitchers = opponent.pitcher
     pitcher = pitchers[pitchers['name'].str.contains(p_name)]
     print('START')
@@ -44,14 +43,14 @@ def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
     print(f"{opponent.name} bp vl:{opponent.proj_opp_bp['fd_wpa_b_vl'].mean()}")
     
     print(len(opponent.used_rp))
-    print(lu)
+    print(team.lineup)
     if extend:
         print(hitters[['name', 'mlb_id', 'fd_wps_pa_vr']])
     return None
     
-t = teams.mariners
-o = teams.astros
-team_notes(t, o, extend = False)
+t = teams.giants
+o = teams.rangers
+team_notes(t, o, extend = True)
 # t.bullpen[['name', 'status']]
 
 o.bullpen[['name', 'pitch_hand', 'fd_wpa_b_rp', 'games_21', 'batters_faced_rp', 'status']].sort_values(by='games_21')
