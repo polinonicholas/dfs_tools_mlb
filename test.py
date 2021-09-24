@@ -12,6 +12,7 @@ s=FDSlate(
           p_fades = [],
           h_fades = [],
           salary_batting_order=5,
+          stack_salary_factor = True,
           )
 
 hitters = s.get_hitters()
@@ -45,7 +46,7 @@ lineups = s.build_lineups(
                       third_max_order = 5,
                       of_max_order = 5,
                       util_max_order = 5,
-                      min_avg_post_stack = 2700,
+                      min_avg_post_stack = 2650,
                       util_replace_filt = 300,
                       all_in_replace_filt = 300,
                       all_in_diff_filt = 0,
@@ -87,7 +88,9 @@ lineups = s.build_lineups(
                       
                       )
 
+s.stacks_df()['stacks'].to_dict()
 
+s.p_lu_df()[['name', 'points', 'lus']]
 
 # remove_positions  = {
 #                           '':'1b',
@@ -175,12 +178,12 @@ pitcher_statcast['speed_last_speed'] = pitcher_statcast['last_speed'] - pitcher_
 pitcher_statcast
 
 position_sort_key = 'points'
-first = s.first_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
-second = s.second_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
-ss = s.ss_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
-third = s.third_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
-of = s.of_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
-util = s.util_df[['name', 'points', 'exp_ps_sp_pa', 'exp_ps_sp_raw', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
+first = s.first_df[['name', 'points', 'exp_ps_sp_pa', 'sp_split', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
+second = s.second_df[['name', 'points', 'exp_ps_sp_pa', 'sp_split', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
+ss = s.ss_df[['name', 'points', 'exp_ps_sp_pa', 'sp_split', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
+third = s.third_df[['name', 'points', 'exp_ps_sp_pa', 'sp_split', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
+of = s.of_df[['name', 'points', 'exp_ps_sp_pa', 'sp_split', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
+util = s.util_df[['name', 'points', 'exp_ps_sp_pa', 'sp_split', 'fd_salary']].sort_values(by=position_sort_key, ascending=False)
 #lookup individual hitter statcast
 player_name = 'brinson'
 hitter_statcast_time = str(tf.fifteen_days)

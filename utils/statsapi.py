@@ -183,7 +183,7 @@ def get_big(endpoint, params, force=True):
 
     # Make the request
     r = requests.get(url)
-    print(url)
+    # print(url)
     flag = 0
     while r.status_code == 524:
         r = requests.get(url)

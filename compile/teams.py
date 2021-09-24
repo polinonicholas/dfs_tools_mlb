@@ -215,6 +215,7 @@ class Team(metaclass=IterTeam):
     @cached_property
     def starter(self):
         starters = pd.DataFrame(self.depth['starters']).apply(pd.to_numeric, errors = 'ignore')
+        starters = starters[starters['status'] == 'A']
         starters = starters.join(p_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
         starters['p'] = True
         return starters
@@ -458,7 +459,7 @@ class Team(metaclass=IterTeam):
                 self.opp_instance.cache_next_game()
                 return sp_info
             except KeyError:
-                starters = self.opp_instance.rested_sp
+                starters = self.opp_instance.rested_sp()
                 try:
                     projected_sp = starters.loc[starters['fd_ps_s'].idxmax()]
                 except (KeyError, ValueError):
@@ -467,7 +468,7 @@ class Team(metaclass=IterTeam):
                         projected_sp = bullpen.loc[bullpen['batters_faced_sp'].idxmax()]
                     except (KeyError, ValueError):
                         projected_sp = bullpen.loc[bullpen['ppa'].idxmax()]
-                i_d = projected_sp['mlb_id'].item()
+                i_d = int(projected_sp['mlb_id'].item())
                 return statsapi.get('people', {'personIds': i_d})['people'][0]
         return self.next_game_pk
     def projected_sp(self):
@@ -488,7 +489,7 @@ class Team(metaclass=IterTeam):
                 self.cache_next_game()
                 return sp_info
             except KeyError:
-                starters = self.rested_sp
+                starters = self.rested_sp()
                 try:
                     projected_sp = starters.loc[starters['fd_ps_s'].idxmax()]
                 except (KeyError, ValueError):
@@ -497,7 +498,7 @@ class Team(metaclass=IterTeam):
                         projected_sp = bullpen.loc[bullpen['batters_faced_sp'].idxmax()]
                     except (KeyError, ValueError):
                         projected_sp = bullpen.loc[bullpen['ppa'].idxmax()]
-                i_d = projected_sp['mlb_id'].item()
+                i_d = int(projected_sp['mlb_id'].item())
                 return statsapi.get('people', {'personIds': i_d})['people'][0]
         return self.next_game_pk
     @cached_property
@@ -919,8 +920,8 @@ class Team(metaclass=IterTeam):
                 h_df.loc[h_df['order'] == order, 'exp_pa_bp'] += 1
                 order += 1
                 exp_bf_bp -= 1
-            h_df.loc[lefties, 'exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_vl'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
-            h_df.loc[righties, 'exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_vr'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
+            h_df.loc[lefties, 'exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_vl'].median() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
+            h_df.loc[righties, 'exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_vr'].median() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
             
             # h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
             h_df['exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
@@ -1121,7 +1122,7 @@ class Team(metaclass=IterTeam):
     @cached_property
     def last_venue(self):
         if self.last_game_pk:
-            return self.next_game['gameData']['venue']['id']
+            return self.last_game['gameData']['venue']['id']
         return self.last_game_pk
     
     @cached_property
@@ -1247,6 +1248,14 @@ class Team(metaclass=IterTeam):
         if self.no_rest:
             return self.last_game['liveData']['boxscore']['teams'][self.was_ha]['pitchers'][1:]
         return []
+    
+    @cached_property
+    def used_rp_names(self):
+        if self.used_rp:
+        
+            pitcher_df = self.bullpen[self.bullpen['mlb_id'].isin(self.used_rp)]
+            return pitcher_df['name']
+        return None
     
     @cached_property
     def no_rest_travel(self):
@@ -1465,8 +1474,8 @@ class Team(metaclass=IterTeam):
             if team.name == self.opp_name:
                 return team
     
-    @cached_property
-    def rested_sp(self):
+    
+    def rested_sp(self, return_used_ids = False):
         if self.last_game_pk:
             try:
                 games = self.past_games[-4:]
@@ -1474,7 +1483,7 @@ class Team(metaclass=IterTeam):
                 games = self.past_games
             game_ids = []
             for game in games:
-                print()
+               
                 game_ids.append(game['games'][0]['gamePk'])
             game_ids = ids_string(game_ids)
             call = statsapi.get('schedule', {'gamePks': game_ids, 'sportId': 1, 'hydrate': 'probablePitcher'})
@@ -1484,7 +1493,11 @@ class Team(metaclass=IterTeam):
                 away_sp = g['games'][0]['teams']['away'].get('probablePitcher', {}).get('id') 
                 recent_sp.add(home_sp)
                 recent_sp.add(away_sp)
-            starters = self.starter
+                
+            starters = self.pitcher[(self.pitcher['batters_faced_sp'] > 0) & (self.pitcher['status'] == 'A')]
+            if return_used_ids:
+                return recent_sp
+            
             return starters[~starters['mlb_id'].isin(recent_sp)]
         return set()
     def del_props(self):
@@ -1520,37 +1533,119 @@ class Team(metaclass=IterTeam):
     def clear_all_team_cache(self):
         self.clear_team_cache(directories = [settings.BP_DIR, settings.SCHED_DIR,settings.LINEUP_DIR, settings.GAME_DIR])
         return f"Cleared vital directories for {self.name}."
+    
+    @staticmethod
+    def non_rested_teams(travel_only = True):
+        no_rest = {'away': set(),
+                   'home': set()}
+        for t in Team:
+            if not t.no_rest:
+                continue
+            if travel_only:
+                if t.no_rest_travel and t.is_home:
+                    no_rest['home'].add(t.name)
+                elif t.no_rest_travel and not t.is_home:
+                    no_rest['away'].add(t.name)
+            else:
+                 if not t.no_rest:
+                     continue
+                 if t.no_rest and t.is_home:
+                     no_rest['home'].add(t.name)
+                 elif t.no_rest and not t.is_home:
+                    no_rest['away'].add(t.name)
+        return no_rest
+    @staticmethod
+    def team_notes(team, opponent,  p_hand = None, p_name = None, extend = False):
+        if not p_name:
+            p_name = team.opp_sp['lastName']
+        if not p_hand:
+            p_hand = team.opp_sp_hand
+        hitters = team.hitter
+        pitchers = opponent.pitcher
+        pitcher = pitchers[pitchers['name'].str.contains(p_name)]
+        print(f"Report for {team.name} vs. {team.opp_name}:")
+        print(pitcher[['name','fd_wps_b_vr', 'fd_wps_b_vl', 'batters_faced_vl', 'pitches_start', 'mlb_id']])
+        print(team.sp_avg(return_full_dict=True))
+        if p_hand == 'R':
+            print(team.lineup_df()[['name', 'fd_wpa_pa_vr', 'pa_vr', 'fd_hr_weight_vr', 'bat_side']])
+            print(team.lineup_df()['fd_wpa_pa_vr'].describe())
+        
+        elif p_hand == 'L':
+            print(team.lineup_df()[['name', 'fd_wpa_pa_vl', 'pa_vl', 'fd_hr_weight_vl', 'bat_side']])
+            print(team.lineup_df()['fd_wpa_pa_vl'].describe())
+        else:
+            print(team.lineup_df()[['name', 'fd_wpa_pa', 'pa', 'fd_hr_weight', 'bat_side']])
+            print(team.lineup_df()['fd_wpa_pa'].describe())
+        print(f"{p_name} is {p_hand}")
+        print(pitcher[['name','fd_wpa_b_vr', 'fd_wpa_b_vl', 'batters_faced_vl', 'pitches_start']])
+        if p_hand == 'R':
+            print(team.lineup_df()[['name', 'fd_wps_pa_vr','fd_wps_pa_vl', 'pa_vr', 'fd_hr_weight_vr', 'bat_side']])
+            print(team.lineup_df()['fd_wps_pa_vr'].describe())
+        elif p_hand == 'L':
+            print(team.lineup_df()[['name', 'fd_wps_pa_vl', 'fd_wps_pa_vr', 'pa_vl', 'fd_hr_weight_vl', 'bat_side']])
+            print(team.lineup_df()['fd_wps_pa_vl'].describe())
+        else:
+            print(team.lineup_df()[['name', 'fd_wps_pa', 'pa', 'fd_hr_weight', 'bat_side']])
+            print(team.lineup_df()['fd_wps_pa'].describe())
+        
+        print(f"{opponent.name} bp ovr:{team.proj_opp_bp['fd_wpa_b_rp'].mean()}")
+        print(f"{opponent.name} bp vr:{team.proj_opp_bp['fd_wpa_b_vr'].mean()}")
+        print(f"{opponent.name} bp vl:{team.proj_opp_bp['fd_wpa_b_vl'].mean()}")
+        print()
+        print(len(opponent.used_rp))
+        print(f"Current lineup for {team.name}:")
+        print(team.lineup)
+        print('RP used yesterday:')
+        print(opponent.used_rp_names)
+        
+        bullpen = opponent.bullpen[opponent.bullpen['status'] == 'A']
+        print(bullpen[['name', 'pitch_hand', 'fd_wpa_b_rp', 'games_21', 'batters_faced_rp', 'status']].sort_values(by='games_21', ascending = False))
+        if extend:
+            print(hitters[['name', 'mlb_id', 'fd_wps_pa_vr']])
+            print(team.lineup_df()[['name', 'mlb_id']])
+            print("Weather input:")
+            print(team.weather)
+        return None
 
+
+
+angels = Team(mlb_id = 108, name = 'angels')
+astros = Team(mlb_id = 117, name = 'astros')
 athletics = Team(mlb_id = 133, name = 'athletics')
+blue_jays = Team(mlb_id = 141, name = 'blue jays')
+braves = Team(mlb_id = 144, name = 'braves')
+brewers = Team(mlb_id = 158, name = 'brewers')
+cardinals = Team(mlb_id = 138, name = 'cardinals')
+cubs = Team(mlb_id = 112, name = 'cubs')
+diamondbacks = Team(mlb_id = 109, name = 'diamondbacks')
+dodgers = Team(mlb_id = 119, name = 'dodgers')
+giants = Team(mlb_id = 137, name = 'giants')
+indians = Team(mlb_id = 114, name = 'indians')
+mariners = Team(mlb_id = 136, name = 'mariners')
+marlins = Team(mlb_id = 146, name = 'marlins')
+mets = Team(mlb_id = 121, name = 'mets')
+nationals = Team(mlb_id = 120, name = 'nationals') 
+orioles = Team(mlb_id = 110, name = 'orioles')
+phillies = Team(mlb_id = 143, name = 'phillies')
 pirates = Team(mlb_id = 134, name = 'pirates')
 padres = Team(mlb_id = 135, name = 'padres')
-mariners = Team(mlb_id = 136, name = 'mariners')
-giants = Team(mlb_id = 137, name = 'giants', custom_lineup =[664774, 592178, 573262, 457763, 543105, 543063, 527038, 621453, 592332])
-cardinals = Team(mlb_id = 138, name = 'cardinals')
 rays = Team(mlb_id = 139, name = 'rays')
 rangers = Team(mlb_id = 140, name = 'rangers')
-blue_jays = Team(mlb_id = 141, name = 'blue jays')
-twins = Team(mlb_id = 142, name = 'twins')
-phillies = Team(mlb_id = 143, name = 'phillies')
-braves = Team(mlb_id = 144, name = 'braves')
-white_sox = Team(mlb_id = 145, name = 'white sox')
-marlins = Team(mlb_id = 146, name = 'marlins')
-yankees = Team(mlb_id = 147, name = 'yankees')
-brewers = Team(mlb_id = 158, name = 'brewers')
-angels = Team(mlb_id = 108, name = 'angels')
-diamondbacks = Team(mlb_id = 109, name = 'diamondbacks')
-orioles = Team(mlb_id = 110, name = 'orioles')
 red_sox = Team(mlb_id = 111, name = 'red sox')
-cubs = Team(mlb_id = 112, name = 'cubs')
 reds = Team(mlb_id = 113, name = 'reds')
-indians = Team(mlb_id = 114, name = 'indians')
 rockies = Team(mlb_id = 115, name = 'rockies')
-tigers = Team(mlb_id = 116, name = 'tigers')
-astros = Team(mlb_id = 117, name = 'astros')
 royals = Team(mlb_id = 118, name = 'royals')
-dodgers = Team(mlb_id = 119, name = 'dodgers')
-nationals = Team(mlb_id = 120, name = 'nationals') 
-mets = Team(mlb_id = 121, name = 'mets')
-#'Out To CF'
+tigers = Team(mlb_id = 116, name = 'tigers')
+twins = Team(mlb_id = 142, name = 'twins')
+white_sox = Team(mlb_id = 145, name = 'white sox')
+yankees = Team(mlb_id = 147, name = 'yankees')
 
+# lad = [607208, 571970, 605141, 457759, 608369, 669257, 621035, 641355, 628711]
+# sdp = [665487, 592518, 630105, 502054, 571976, 543592, 595777, 673490, 605397]
+# oak = [543281, 516782, 621566, 476704, 656305, 592192, 643393, 543228, 462101]
+# bos = [571771, 656941, 502110, 593428, 646240, 592669, 666915, 543877, 578428]
+
+
+
+#'Out To CF'
 
