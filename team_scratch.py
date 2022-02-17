@@ -5,11 +5,11 @@ t = teams.royals
 o = teams.white_sox
 teams.Team.team_notes(t, o, extend = True)
 
-active = ['indians', 'mets', 'brewers', 'dodgers', 'yankees', 'blue jays',
-       'rays', 'white sox', 'red sox', 'marlins', 'astros', 'cardinals',
-       'athletics', 'phillies', 'padres', 'angels', 'reds', 'braves',
-       'rockies', 'tigers', 'diamondbacks', 'mariners', 'twins', 'royals',
-       'orioles', 'rangers']
+active = ['mets', 'brewers', 'dodgers', 'yankees', 'blue jays', 'rays',
+       'phillies', 'indians', 'marlins', 'astros', 'red sox', 'white sox',
+       'giants', 'reds', 'athletics', 'nationals', 'tigers', 'rockies',
+       'mariners', 'twins', 'orioles', 'diamondbacks', 'royals',
+       'pirates', 'angels', 'rangers']
     
 
 opposing_sp = {}

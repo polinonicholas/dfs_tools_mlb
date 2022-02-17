@@ -12,16 +12,16 @@ s=FDSlate(
           p_fades = [],
           h_fades = [],
           salary_batting_order=5,
-          stack_salary_factor = True,
+          stack_salary_factor = False,
           )
 
 hitters = s.get_hitters()
 pitchers = s.get_pitchers()
 hitter_mlb_ids = hitters[['name', 'mlb_id']]
-
+s.active_teams
 
 lineups = s.build_lineups(
-                      info_only = True,
+                      info_only = False,
                       index_track = 0, 
                       lus = 150, 
                       max_lu_total = 150,
@@ -50,8 +50,8 @@ lineups = s.build_lineups(
                       util_replace_filt = 300,
                       all_in_replace_filt = 300,
                       all_in_diff_filt = 0,
-                      all_in_replace_order_stack = 5,
-                      all_in_replace_order_sec = 5,
+                      all_in_replace_order_stack = 7,
+                      all_in_replace_order_sec = 7,
                       supreme_replace_order = 0,
                       replace_secondary_all_in = True,
                       replace_primary_all_in= True,
@@ -82,9 +82,46 @@ lineups = s.build_lineups(
                       stack_info_order = 5,
                       stack_info_size = 4,
                       stack_info_salary_factor=False,
-                      custom_pitchers = None,
-                      custom_stacks = None,
-                      custom_secondary = None,
+                      custom_pitchers = {3: 50, 9: 50, 19:50}
+,
+                      custom_stacks = {
+ 'brewers': 15,
+ 'dodgers': 15,
+ 'rays': 15,
+ 'phillies': 15,
+ 
+ 
+ 'giants': 15,
+ 
+ 
+ 
+ 'rockies': 15,
+ 'mariners': 15,
+
+ 'orioles': 15,
+ 
+ 'royals': 15,
+ 
+ 'rangers': 15},
+                      custom_secondary = {
+ 'brewers': 15,
+ 'dodgers': 15,
+ 'rays': 15,
+ 'phillies': 15,
+ 
+ 
+ 'giants': 15,
+ 
+ 
+ 
+ 'rockies': 15,
+ 'mariners': 15,
+
+ 'orioles': 15,
+ 
+ 'royals': 15,
+ 
+ 'rangers': 15},
                       
                       )
 
@@ -115,8 +152,25 @@ s.p_lu_df()[['name', 'points', 'lus']]
 #                           }
 
 
-   
+{
+ 'brewers': 15,
+ 'dodgers': 15,
+ 'rays': 15,
+ 'phillies': 15,
+ 
+ 
+ 'giants': 15,
+ 
+ 
+ 
+ 'rockies': 15,
+ 'mariners': 15,
 
+ 'orioles': 15,
+ 
+ 'royals': 15,
+ 
+ 'rangers': 15}
 
 #dict p_df.index: p_df: lineups to be in
 default_pitcher = s.p_df()['points'].to_dict()
@@ -126,7 +180,7 @@ all_stacks = s.points_df()[["raw_points", "points","salary", "sp_mu", "raw_talen
                             "ump_avg", "venue_avg", "env_avg", "sp_avg", "mz", 'z']].sort_values(by='z', ascending=False)
 
 all_pitchers = s.p_df()[['name', 'team','points', 'fd_salary', 'pitches_start', 'mu','raw_mu', 'k_pred', 'k_pred_raw', 
-                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='k_pred', ascending=False)
+                         'fd_id', 'venue_avg', 'ump_avg', 'venue_temp', 'exp_ps_raw', 'exp_inn', 'fav', 'env_points', 'mz', 'z']].sort_values(by='z', ascending=False)
 
 
 #get pitcher statcast info for slate
