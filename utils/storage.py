@@ -33,7 +33,5 @@ def clean_directory(directory, force_delete=False):
     return "Directory has been cleaned."
     
 
-    
-            
             
     

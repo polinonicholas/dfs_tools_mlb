@@ -10,38 +10,32 @@ from dfs_tools_mlb.compile import current_season as cs
 data_path_h = settings.STORAGE_DIR.joinpath(f'player_data_h_{tf.today}.pickle')
 data_path_p = settings.STORAGE_DIR.joinpath(f'player_data_p_{tf.today}.pickle')
 if not data_path_h.exists() or not data_path_p.exists():
-    fd_scoring = {
-    'hitters': {
-        'base': 3,
-        'rbi' : 3.5,
-        'run' : 3.2,
-        'sb' : 6,
-        'hr': 18.7,
-        
-        },
-    'pitchers': {
-        'inning': 3,
-        'out': 1,
-        'k' : 3,
-        'er': -3,
-        'qs': 4,
-        'win': 6
-        }
-    }
-    i = fd_scoring['pitchers']['inning']
-    k = fd_scoring['pitchers']['k']
-    er = fd_scoring['pitchers']['er']
-    b = fd_scoring['hitters']['base']
-    rbi = fd_scoring['hitters']['rbi']
-    r = fd_scoring['hitters']['run']
-    s = fd_scoring['hitters']['sb']
-    hr = fd_scoring['hitters']['hr']
-    o = fd_scoring['pitchers']['out']
+
+    i = settings.fd_scoring['pitchers']['inning']
+    k = settings.fd_scoring['pitchers']['k']
+    er = settings.fd_scoring['pitchers']['er']
+    b = settings.fd_scoring['hitters']['base']
+    rbi = settings.fd_scoring['hitters']['rbi']
+    r = settings.fd_scoring['hitters']['run']
+    s = settings.fd_scoring['hitters']['sb']
+    hr = settings.fd_scoring['hitters']['hr']
+    o = settings.fd_scoring['pitchers']['out']
     x = (r + rbi) / 2
-    
     weights_path = settings.ARCHIVE_DIR.joinpath('weighted_runs_df.pickle')
-    weights = pd.read_pickle(weights_path)
-    weights = weights[weights['Season'] > 2015]
+    try:
+        weights = pd.read_pickle(weights_path)
+    except FileNotFoundError:
+        try:
+            df = pd.read_csv (settings.DL_FOLDER + '/FanGraphs Leaderboard.csv')
+            with open(weights_path, "wb") as file:
+                pickle.dump(df, file)
+        except FileNotFoundError:
+            print(f"Pickled weights file is missing from \
+                  {settings.ARCHIVE_DIR.joinpath('weighted_runs_df.pickle')}\
+                  , as is downloaded CSV file. Obtain one at \
+                      https://www.fangraphs.com/guts.aspx?type=cn")
+            
+    weights = weights[weights['Season'] > settings.SEASON_WEIGHT_START]
     weight_bb = weights['wBB'].mean()
     weight_hbp = weights['wHBP'].mean()
     weight_1b = weights['w1B'].mean()
@@ -221,11 +215,6 @@ hp_q_filt = (hp['pa'] >= hp['pa'].mean())
 hp_q = hp[hp_q_filt]
 
 
-
-
-
-
-
 if not data_path_p.exists():
 
     p_splits = pd.DataFrame(get_splits_p(range(settings.stat_range['player_start'], settings.stat_range['end']),sport=1,pool='ALL',get_all=True))
@@ -250,6 +239,7 @@ if not data_path_p.exists():
               f'holds_{second_season}': 0, 
               f'complete_games_{second_season}': 0, 
               f'shutouts_{second_season}': 0}
+   
     p_splits.fillna(value=values, inplace=True)
     
         
@@ -262,15 +252,28 @@ if not data_path_p.exists():
     p_splits['2b'] = p_splits['2b_vl'] + p_splits['2b_vr']
     p_splits['3b'] = p_splits['3b_vl'] + p_splits['3b_vr']
     p_splits['hr'] = p_splits['hr_vl'] + p_splits['hr_vr']
-    p_splits['games_sp'] = p_splits['games_sp_20'] + p_splits['games_sp_21']
-    p_splits['games'] = p_splits['games_20'] + p_splits['games_21']
-    p_splits['games_rp'] = p_splits['games'] - p_splits['games_sp']
-    p_splits['wins'] = p_splits['wins_20'] + p_splits['wins_21']
-    p_splits['losses'] = p_splits['losses_20'] + p_splits['losses_21']
-    p_splits['saves'] = p_splits['saves_20'] + p_splits['saves_21']
-    p_splits['holds'] = p_splits['holds_20'] + p_splits['holds_21']
-    p_splits['complete_games'] = p_splits['complete_games_20'] + p_splits['complete_games_21']
-    p_splits['shutouts'] = p_splits['shutouts_20'] + p_splits['shutouts_21']
+    try:
+        
+        p_splits['games_sp'] = p_splits['games_sp_21'] + p_splits['games_sp_22']
+        p_splits['games'] = p_splits['games_21'] + p_splits['games_22']
+        p_splits['games_rp'] = p_splits['games'] - p_splits['games_sp']
+        p_splits['wins'] = p_splits['wins_21'] + p_splits['wins_22']
+        p_splits['losses'] = p_splits['losses_21'] + p_splits['losses_22']
+        p_splits['saves'] = p_splits['saves_21'] + p_splits['saves_22']
+        p_splits['holds'] = p_splits['holds_21'] + p_splits['holds_22']
+        p_splits['complete_games'] = p_splits['complete_games_21'] + p_splits['complete_games_22']
+        p_splits['shutouts'] = p_splits['shutouts_21'] + p_splits['shutouts_22']
+    except KeyError:
+        p_splits['games_sp'] = p_splits['games_sp_21']
+        p_splits['games'] = p_splits['games_21']
+        p_splits['games_rp'] = p_splits['games'] - p_splits['games_sp']
+        p_splits['wins'] = p_splits['wins_21']
+        p_splits['losses'] = p_splits['losses_21']
+        p_splits['saves'] = p_splits['saves_21']
+        p_splits['holds'] = p_splits['holds_21']
+        p_splits['complete_games'] = p_splits['complete_games_21']
+        p_splits['shutouts'] = p_splits['shutouts_21']
+        
     p_splits['pickoffs'] = p_splits['pickoffs_vr'] + p_splits['pickoffs_vl']
     p_splits['gidp'] = p_splits['gidp_vr'] + p_splits['gidp_vl']
     p_splits['hits'] = p_splits['hits_vr'] + p_splits['hits_vl']
@@ -301,7 +304,7 @@ if not data_path_p.exists():
     p_splits['bases+'] = p_splits['total_bases'] + p_splits['bb'] + p_splits['hb']
     
     p_splits['pitches_inning'] = p_splits['total_pitches'] / (p_splits['outs'] / 3)
-    p_splits['pitches_batter'] = p_splits['total_pitches'] / p_splits['batters_faced']
+    p_splits['ppb'] = p_splits['total_pitches'] / p_splits['batters_faced']
     p_splits['gb_fb'] = p_splits['gb'] / p_splits['fb']
     p_splits['k_b'] = p_splits['k'] / p_splits['batters_faced']
     p_splits['bb_b'] = p_splits['bb'] / p_splits['batters_faced']
@@ -560,5 +563,41 @@ p_q_l_vl = p_splits[l_filt & l_q_filt]
 p_q_r_vl = p_splits[r_filt & l_q_filt]
 p_q_l_vr = p_splits[l_filt & r_q_filt]
 p_q_r_vr = p_splits[r_filt & r_q_filt]
+
+adjustment_dfs = {'hitting': {
+    'RAW': {
+        'pitchers': hp_q,
+        'hitters': h_q,},
+    'L': {
+        'vs_l': h_l_vl,
+        'vs_r': h_l_vr},
+    'R': {'vs_l': h_r_vl,
+          'vs_r': h_r_vr},
+    },
+    
+    'pitchers': {'BP': {
+        'L': {'vs_l': p_q_l_vl ,
+             'vs_r': p_q_r_vr},
+        'R': {
+            'vs_l': p_q_r_vl,
+            'vs_r': p_q_l_vr },
+        'RAW': {'vs_l': p_q_vl ,
+                'vs_r': p_q_vr,
+                'raw': p_q_rp}},
+        'SP': {'L': {'vs_l': p_q_l_vl,
+                     'vs_r': p_q_l_vr},
+               'R': {'vs_l': p_q_r_vl,
+                     'vs_r': p_q_r_vr},
+               'RAW': {'vs_l': p_q_vl,
+                       'vs_r': p_q_vr,
+                       'raw': p_q_sp}}
+        
+        }
+    }
+
+
+
+
+
 
 

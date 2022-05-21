@@ -1,4 +1,8 @@
 from dfs_tools_mlb.utils.subclass import Map
+import re
+from functools import lru_cache
+
+# from dfs_tools_mlb.utils.statsapi import event_types
 
 mlb_api_codes = Map({
     'players': Map({
@@ -54,6 +58,182 @@ mlb_api_codes = Map({
         'fb': ['FA', 'FT', 'FF', 'FC', 'FS', 'FO'],
         'bb': ['CU', 'KC', 'KN', 'SC', 'SI', 'SL', 'SV', 'CS'],
         'cu': ['CH', 'EP']
+        }),
+    'event_types': Map({
+        'all': ['pickoff_1b',
+         'pickoff_2b',
+         'pickoff_3b',
+         'pickoff_error_1b',
+         'pickoff_error_2b',
+         'pickoff_error_3b',
+         'no_pitch',
+         'single',
+         'double',
+         'triple',
+         'home_run',
+         'double_play',
+         'field_error',
+         'error',
+         'field_out',
+         'fielders_choice',
+         'fielders_choice_out',
+         'force_out',
+         'grounded_into_double_play',
+         'grounded_into_triple_play',
+         'strikeout',
+         'strike_out',
+         'strikeout_double_play',
+         'strikeout_triple_play',
+         'triple_play',
+         'sac_fly',
+         'catcher_interf',
+         'batter_interference',
+         'fielder_interference',
+         'runner_interference',
+         'fan_interference',
+         'batter_turn',
+         'ejection',
+         'cs_double_play',
+         'defensive_indiff',
+         'sac_fly_double_play',
+         'sac_bunt',
+         'sac_bunt_double_play',
+         'walk',
+         'intent_walk',
+         'hit_by_pitch',
+         'injury',
+         'os_ruling_pending_prior',
+         'os_ruling_pending_primary',
+         'at_bat_start',
+         'passed_ball',
+         'other_advance',
+         'runner_double_play',
+         'runner_placed',
+         'pitching_substitution',
+         'offensive_substitution',
+         'defensive_switch',
+         'umpire_substitution',
+         'pitcher_switch',
+         'game_advisory',
+         'stolen_base',
+         'stolen_base_2b',
+         'stolen_base_3b',
+         'stolen_base_home',
+         'caught_stealing',
+         'caught_stealing_2b',
+         'caught_stealing_3b',
+         'caught_stealing_home',
+         'defensive_substitution',
+         'pickoff_caught_stealing_2b',
+         'pickoff_caught_stealing_3b',
+         'pickoff_caught_stealing_home',
+         'balk',
+         'wild_pitch',
+         'other_out'],
+        'plate_appearance':['single',
+         'double',
+         'triple',
+         'home_run',
+         'double_play',
+         'field_error',
+         'field_out',
+         'fielders_choice',
+         'fielders_choice_out',
+         'force_out',
+         'grounded_into_double_play',
+         'strikeout',
+         'strike_out',
+         'strikeout_double_play',
+         'strikeout_triple_play',
+         'triple_play',
+         'sac_fly',
+         'catcher_interf',
+         'batter_interference',
+         'fan_interference',
+         'sac_fly_double_play',
+         'sac_bunt',
+         'sac_bunt_double_play',
+         'walk',
+         'intent_walk',
+         'hit_by_pitch',
+         'os_ruling_pending_primary'],
+        'hit': ['single', 'double', 'triple', 'home_run'],
+        'base_running': ['pickoff_1b',
+         'pickoff_2b',
+         'pickoff_3b',
+         'pickoff_error_1b',
+         'pickoff_error_2b',
+         'pickoff_error_3b',
+         'error',
+         'cs_double_play',
+         'defensive_indiff',
+         'passed_ball',
+         'other_advance',
+         'runner_double_play',
+         'stolen_base_2b',
+         'stolen_base_3b',
+         'stolen_base_home',
+         'caught_stealing_2b',
+         'caught_stealing_3b',
+         'caught_stealing_home',
+         'pickoff_caught_stealing_2b',
+         'pickoff_caught_stealing_3b',
+         'pickoff_caught_stealing_home',
+         'balk',
+         'wild_pitch',
+         'other_out'],
+        'void': ['sac_fly',
+                 'catcher_interf',
+                 'intent_walk',
+                 'sac_bunt',
+                 'fan_interference',
+                 'batter_interference',
+                 'hit_by_pitch',
+                 'field_error'  
+            ],
+        'success': [
+         'walk',
+         'home_run',
+         'single',
+         'double',
+         'triple',
+        ],
+        
+        'fail': [
+         'double_play',
+         'field_out',
+         'fielders_choice',
+         'fielders_choice_out',
+         'force_out',
+         'grounded_into_double_play',
+         'strikeout',
+         'strike_out',
+         'strikeout_double_play',
+         'strikeout_triple_play',
+         'triple_play',
+         'sac_fly_double_play',
+         'sac_bunt_double_play',
+         ],
+        'strikeout': ['strikeout',
+        'strike_out',
+        'strikeout_double_play',
+        'strikeout_triple_play'],
+        'error': Map({'field': ['field_error'],
+                       'all': ['field_error',
+                               'pickoff_error_1b',
+                               'pickoff_error_2b',
+                               'pickoff_error_3b']}),
+        'stolen_base': Map({'success': [ 'stolen_base_2b',
+                                       'stolen_base_3b',
+                                       'stolen_base_home'],
+                           'fail': ['caught_stealing_2b',
+                           'caught_stealing_3b',
+                           'caught_stealing_home',
+                           'pickoff_caught_stealing_2b',
+                           'pickoff_caught_stealing_3b',
+                           'pickoff_caught_stealing_home']}),
+       
+        
         })
     })
 
@@ -213,8 +393,8 @@ team_info = Map({
         'location': 'cincinnati',
         'venue': {'id': 2602, 'name': 'Great American Ball Park', 'link': '/api/v1/venues/2602'}
         },
-    'indians': {
-        'full_name': 'cleveland indians',
+    'guardians': {
+        'full_name': 'cleveland guardians',
         'mlb_id': 114,
         'abbreviations': ['cle'],
         'location': 'cleveland',
@@ -270,3 +450,56 @@ team_info = Map({
         'venue': {'id': 3289, 'name': 'Citi Field', 'link': '/api/v1/venues/3289'}
         },
     })
+
+@lru_cache
+def current_parks():
+    parks = set()
+    for k in team_info:
+        if team_info[k].get('venue'):
+            parks.add(team_info[k]['venue']['id'])
+    return parks
+
+
+def api_player_info_dict(d):
+    p_info = d['person']
+    player = {'mlb_id': p_info['id'],
+              'name': p_info.get('fullName', ''),
+              'mlb_api': p_info.get('link', ''),
+              'number': p_info.get('primaryNumber', ''),
+              'born': p_info.get('birthCity', '') + ', ' + p_info.get('birthStateProvince', '') ,
+              'height': '.'.join(re.findall('[0-9]', p_info.get('height', ''))),
+              'weight': p_info.get('weight', ''),
+              'nickname': p_info.get('nickName', ''),
+              'debut': p_info.get('mlbDebutDate', ''),
+              'bat_side': p_info.get('batSide', {}).get('code', ''),
+              'pitch_hand': p_info.get('pitchHand', {}).get('code', ''),
+              'age': p_info.get('currentAge', ''),
+              'note': p_info.get('note', ''),
+              'position_type': d['position']['type'],
+              'position': d['position']['code'],
+              'status': d.get('status', {}).get('code', ''),
+              
+              }
+    return player
+
+def api_pitcher_info_dict(d):
+    player = {'mlb_id': d['id'],
+              'name': d.get('fullName', ''),
+              'mlb_api': d.get('link', ''),
+              'born': d.get('birthCity', '') + ', ' + d.get('birthStateProvince', '') ,
+              'height': '.'.join(re.findall('[0-9]', d.get('height', ''))),
+              'weight': d.get('weight', ''),
+              'nickname': d.get('nickName', ''),
+              'debut': d.get('mlbDebutDate', ''),
+              'bat_side': d.get('batSide', {}).get('code', ''),
+              'pitch_hand': d.get('pitchHand', {}).get('code', ''),
+              'age': d.get('currentAge', ''),
+              
+                  }
+    return player
+
+
+
+    
+
+

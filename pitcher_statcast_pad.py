@@ -117,43 +117,5 @@ def print_h_stats(player_id, year):
     print(filtered_hitter_plays.describe())
     return None
 
-print_p_stats(425844, 2021)
-
-{'Framber Valdez': {'id': 664285},
- 'Shohei Ohtani': {'id': 660271},
- 'Glenn Otto': {'id': 657248},
- 'Chris Ellis': {'id': 595939},
- 'Trevor Rogers': {'id': 669432},
- 'Eli Morgan': {'id': 669212},
- 'Tyler Mahle': {'id': 641816},
- 'Marco Gonzales': {'id': 594835},
- 'Joe Musgrove': {'id': 605397},
- 'Adrian Houser': {'id': 605288},
- 'Madison Bumgarner': {'id': 518516},
- 'Ian Anderson': {'id': 666120},
- 'Jordan Montgomery': {'id': 656756},
- 'Robbie Ray': {'id': 592662},
- 'German Marquez': {'id': 608566},
- 'Julio Urias': {'id': 628711},
- 'Tyler Alexander': {'id': 641302},
- 'Paul Blackburn': {'id': 621112},
- 'Carlos Rodon': {'id': 607074},
- 'Jon Lester': {'id': 452657},
- 'Sam Coonrod': {'id': 656322},
- 'Griffin Jax': {'id': 643377},
- 'Michael Wacha': {'id': 608379},
- 'Daniel Lynch': {'id': 663738},
- 'Tanner Houck': {'id': 656557},
- 'Tylor Megill': {'id': 656731}}
-
-print_h_stats(609275, 2021)
-        name  mlb_id
-0     Brandon Lowe  664040
-1  Randy Arozarena  668227
-2    Wander Franco  677551
-3   Austin Meadows  640457
-4      Joey Wendle  621563
-5      Mike Zunino  572287
-6   Brett Phillips  621433
-7    Jordan Luplow  656669
-8  Kevin Kiermaier  595281
+print_p_stats(343434, 2022)
+print_h_stats(12123, 2022)

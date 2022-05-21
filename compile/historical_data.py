@@ -13,7 +13,8 @@ import os
 from dfs_tools_mlb import settings
 import re
 import pandas as pd
-
+from collections import Counter
+from pathlib import Path
 
 
 def format_season(season):
@@ -27,6 +28,58 @@ def format_season(season):
             'season_id': season['seasonId']
             }
     return season_info
+#args used for starting at the last compiled date of current_season
+def season_start_end(season, *args, start_from_last = False):
+    months = mlb_months(int(season['season_id']))
+    #error occurs when loading data for 2004-04-04 (missing 3 games total).
+    if int(season['season_id']) == 2004:
+        start = '2004-04-05'
+    else:
+        start = season['reg_start']
+    april_end = months[4][1]
+    may_start = months[5][0]
+    may_end = months[5][1]
+    june_start = months[6][0]
+    june_end = months[6][1]
+    july_start = months[7][0]
+    july_end = months[7][1]
+    august_start = months[8][0]
+    august_end = months[8][1]
+    september_start = months[9][0]
+    end = season['reg_end']
+    #covid season began 07-23-2020
+    if int(season['season_id']) == 2020:
+        periods = {
+        start:july_end,
+        august_start: august_end,
+        september_start: end
+        }
+    #strike ended season on 1994-08-11
+    elif int(season['season_id']) == 1994:
+        periods = {
+            start:april_end,
+            may_start: may_end,
+            june_start: june_end,
+            july_start: july_end,
+            august_start: end,
+            }
+    else:
+        periods = {
+            start:april_end,
+            may_start: may_end,
+            june_start: june_end,
+            july_start: july_end,
+            august_start: august_end,
+            september_start: end
+            }
+        
+    if int(season['season_id']) == int(current_season()['season_id']) and start_from_last and args:
+           adj_m = {x[0]:x[1] for x in months.values() if datetime.date.fromisoformat(x[1]).month >= datetime.date.fromisoformat(args[0]).month}
+           months_adj = {args[0] if k == min(adj_m.keys()) else k:v for k,v in adj_m.items()}
+           return months_adj
+       
+    return periods
+
 @lru_cache
 def current_season():
     path = json_path(name='current_season')
@@ -34,7 +87,7 @@ def current_season():
         with open(path) as file:
             season_info = json.load(file)
             file.close()
-        if str(season_info['season_id']) != str(tf.today.year):
+        if str(season_info['season_id']) != str(tf.today.year) and not settings.OFFSEASON_TESTING:
             raise KeyError('Must update info for current season.')
         return season_info
     except (FileNotFoundError, JSONDecodeError, KeyError):
@@ -44,15 +97,13 @@ def current_season():
             json.dump(season_info, file)
             file.close()
         return season_info
-
+    
 def past_seasons(seasons=range(2010,int(current_season()['season_id'])),path=json_path(name='past_seasons')):
     try:
         with open(path) as file:
             season_list = json.load(file)
             file.close()
         if int(season_list[-1]['season_id']) < int(seasons[-1]):
-            print(season_list[-1]['season_id'])
-            print(int(seasons[-1]))
             for year in range(int(season_list[-1]['season_id']) + 1, int(seasons[-1]) + 1):
                 season = statsapi.get('season',{'seasonId':year,'sportId':1})['seasons'][0]
                 season_info = format_season(season)
@@ -90,68 +141,57 @@ def past_seasons(seasons=range(2010,int(current_season()['season_id'])),path=jso
     
 #get historical data for a given season, pickled as list of dictionaries.
 #use a for loop for multiple years.
-def get_historical_data(year):
+def get_historical_data(year, extensive=True, from_scratch=False):
                     gc.collect()
-                    games = []
                     path=pickle_path('historical_data' + '_' + str(year))
-                    fields = 'dates,date,games,status,codedGameState,weather,condition,temp,wind,linescore,teams,home,away,runs,hits,currentInning,venue,id,dayNight,seriesGameNumber,officials,gamePk,probablePitcher,scoringPlays,result,event'
-                    hydrate = 'weather,linescore,officials,probablePitcher,scoringplays'
+                    if Path(path).resolve().exists() and not from_scratch:
+                        with open(path, 'rb') as f:
+                           games = pickle.load(f) 
+                        if int(year) != int(current_season()['season_id']):
+                            return games
+                    else:
+                        games = []
+                    fields = settings.api_fields['get_historical_data']
+                    hydrate = settings.api_hydrate['get_historical_data']
                     try:
                         season = next(x for x in past_seasons() if str(x['season_id']) == str(year))
                     except StopIteration:
                         seasons = past_seasons(seasons=[year])
                         season = next(x for x in seasons if str(x['season_id']) == str(year))
-                    months = mlb_months(int(season['season_id']))
-                    #error occurs when loading data for 2004-04-04 (missing 3 games total).
-                    if int(season['season_id']) == 2004:
-                        start = '2004-04-05'
+                    if int(year) == int(current_season()['season_id']) and not from_scratch and games[-1].get('date'):
+                        total_games = None
+                        total_cached = None
+                        last_date = games[-1]['date']
+                        while not total_games or total_games != total_cached:
+                            date_call = get_big('schedule', {'hydrate': hydrate,'sportId': 1, 'startDate': last_date, 'endDate': last_date, 'fields': fields})['dates']
+                            # completed_games?
+                            total_games = len(date_call[0]['games'])
+                            total_cached = len([g for g in games if str(g['date']) == str(last_date)])
+                            
+                            if total_games == total_cached:
+                                break
+                            last_date = str(datetime.date.fromisoformat(last_date) - datetime.timedelta(days=1))
+                        periods = season_start_end(season, last_date, start_from_last = True)
+
                     else:
-                        start = season['reg_start']
-                    april_end = months[4][1]
-                    may_start = months[5][0]
-                    may_end = months[5][1]
-                    june_start = months[6][0]
-                    june_end = months[6][1]
-                    july_start = months[7][0]
-                    july_end = months[7][1]
-                    august_start = months[8][0]
-                    august_end = months[8][1]
-                    september_start = months[9][0]
-                    end = season['reg_end']
-                    #covid season began 07-23-2020
-                    if int(season['season_id']) == 2020:
-                        periods = {
-                        start:july_end,
-                        august_start: august_end,
-                        september_start: end
-                        }
-                    #strike ended season on 1994-08-11
-                    elif int(season['season_id']) == 1994:
-                        periods = {
-                            start:april_end,
-                            may_start: may_end,
-                            june_start: june_end,
-                            july_start: july_end,
-                            august_start: end,
-                            }
-                    else:
-                        periods = {
-                            start:april_end,
-                            may_start: may_end,
-                            june_start: june_end,
-                            july_start: july_end,
-                            august_start: august_end,
-                            september_start: end
-                            }
-                        
+                        periods = season_start_end(season)
                     for k, v in periods.items():
-                        if datetime.date.fromisoformat(k) > tf.tomorrow:
+                        if datetime.date.fromisoformat(k) > tf.today:
                             break
+                        if games:
+                            cached_games = {g['game'] for g in games}
+                        else:
+                            cached_games = set()
                         games_info = get_big('schedule', {'hydrate': hydrate,'sportId': 1, 'startDate': k, 'endDate': v, 'fields': fields})['dates']
                         for x in games_info:
                             for y in x['games']:
                                 if y['status']['codedGameState'] == "F":
+                                    
+                                    if y['gamePk'] in cached_games:
+                                        continue
+                                    
                                     try:
+                                        cached_games.add(y['gamePk'])
                                         d = {}
                                         d['date'] = x['date']
                                         d['game'] = y['gamePk']
@@ -196,9 +236,9 @@ def get_historical_data(year):
                                             pass
                                         umpires = y['officials']
                                         try:
-                                            if umpires[0]['officialType'] == 'Home Plate':
-                                                d['umpire'] = umpires[0]['official']['id']
-                                        except (KeyError, IndexError):
+                                            ump_id = next(x['official']['id'] for x in umpires if x['officialType'] == 'Home Plate')
+                                            d['umpire'] = ump_id
+                                        except (StopIteration, KeyError):
                                             pass
                                         try:
                                             d['condition'] = y['weather']['condition']
@@ -208,14 +248,40 @@ def get_historical_data(year):
                                             d['day_night'] = y['dayNight']
                                         except KeyError:
                                             pass
-                                        
+                                       
+                                        if extensive:
+                                            try:
+                                                game_call = statsapi.get('game_playByPlay', {'gamePk': d['game']})
+                                                plays = game_call['allPlays']
+                                                conclusive_events = [x['result']['eventType'] for x in plays]
+                                                result_counts = Counter(conclusive_events)
+                                                d.update(result_counts)
+                                                total_rbi = sum([x['result'].get('rbi', 0) for x in plays])
+                                                d['rbi'] = total_rbi
+                                                try:
+                                                    first_play = game_call['allPlays'][0]['about']['startTime']
+                                                    d['start_time'] = datetime.datetime.strptime(first_play, '%Y-%m-%dT%H:%M:%S.%fZ')
+                                                except (KeyError, IndexError):
+                                                    pass
+                                                batter_splits = [x['matchup']['splits']['pitcher'] for x in plays]
+                                                split_flag = 0
+                                                for z in conclusive_events:
+                                                    split_str = f"{batter_splits[split_flag]}_{z}"
+                                                    if not d.get(split_str):
+                                                        d[split_str] = 1
+                                                    else: 
+                                                        d[split_str] += 1
+                                                    split_flag += 1
+                                            except KeyError:
+                                                pass
                                         games.append(d)
                                     except KeyError:
                                         continue
                     with open(path, "wb") as file:
                         pickle.dump(games, file)
                         file.close()
-                    return f"{path}"       
+                    # return f"{path}"   
+                    return games
 
 #pass range(2000,2005) to pickle those years in ARCHIVE_DIR/historical_data_2000-2004.pickle
 #if not already done, compile stats for those years calling historical_data(year)
@@ -229,7 +295,7 @@ def historical_data(start, end=None):
     if len(season_range) == 1:
         file_path = dir_path.joinpath(pickle_path(name = 'historical_data' + '_' + str(season_range[0])))
         try:
-            if season_range[0] != int(current_season()['season_id']):
+            if int(season_range[0]) != int(current_season()['season_id']):
                 with open(file_path, "rb") as f:
                         season = pd.read_pickle(f)
                         f.close()
@@ -251,7 +317,7 @@ def historical_data(start, end=None):
     else:
         for year in season_range:
             file_path = dir_path.joinpath(pickle_path(name = 'historical_data' + '_' + str(year)))
-            if not file_path.exists() or year == int(current_season()['season_id']):
+            if not file_path.exists() or year == int(current_season()['season_id']) and not settings.OFFSEASON_TESTING:
                 get_historical_data(year)
         season_data = []
         files = [file for file in sorted(os.listdir(dir_path)) if re.search('[historical_data][0-9]{4}[.][pickle]', file) and int(file.split('_')[-1].split('.')[0]) in season_range]

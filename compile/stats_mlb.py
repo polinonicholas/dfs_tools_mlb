@@ -16,13 +16,15 @@ def get_statcast_longterm(seasons=[], player_group='', player_ids=[]):
     all_players = []
     if type(player_ids) == list:
         player_ids = ids_string(player_ids)
-    if player_group == 'hitting':
+    if 'hit' in player_group.casefold():
         fields = 'people,id,stats,splits,stat,metric,name,averageValue,minValue,maxValue,unit,numOccurrences,season'
-    elif player_group == 'pitching':
+        h = True
+    elif 'pit' in player_group.casefold():
         fields='people,id,stats,splits,stat,metric,name,averageValue,minValue,maxValue,unit,numOccurrences,details,event,type,code,EP,PO,AB,AS,CH,CU,FA,FT,FF,FC,FS,FO,GY,IN,KC,KN,NP,SC,SI,SL,UN,ST,SV,CS,season'
+        h = False
     for season in seasons:
         season_players = []
-        if player_group == 'hitting':
+        if h:
             hydrate = f"stats(group=[hitting],type=[metricAverages],metrics=[distance,launchSpeed,launchAngle,maxHeight,travelTime,travelDistance,hrDistance,launchSpinRate],season={season})"
             call = statsapi.get('people', {'personIds': player_ids,'hydrate': hydrate, 'fields':fields}, force=True)
             for x in call['people']:
@@ -38,7 +40,7 @@ def get_statcast_longterm(seasons=[], player_group='', player_ids=[]):
                     player[count] = y['numOccurrences']
                 season_players.append(player)
             all_players.extend(season_players)
-        elif player_group == 'pitching':
+        elif not h:
             hydrate = f"stats(group=[pitching],type=[metricAverages],metrics=[releaseSpinRate,releaseExtension,releaseSpeed,effectiveSpeed,launchSpeed,launchAngle],season={season})"
             call = statsapi.get('people', {'personIds': player_ids,'hydrate': hydrate, 'fields':fields}, force=True)
             for x in call['people']:
@@ -475,3 +477,5 @@ def get_p_diff(player_id, season1, season2, filt1='', filt2=''):
     spin_diff = df1['releaseSpinRate'].max() - df2['releaseSpinRate'].max()
     launch_diff = df1['launchAngle'].max() - df2['launchAngle'].max()
     return {'speed': speed_diff, 'spin': spin_diff, 'launch': launch_diff}
+
+

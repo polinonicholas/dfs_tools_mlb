@@ -1,8 +1,8 @@
 from statsapi import get
 from statsapi import endpoints
+from statsapi import meta
 import logging
 import requests
-
 
 def full_schedule(
     date=None,
@@ -200,3 +200,11 @@ def get_big(endpoint, params, force=True):
     return None
     
 
+def event_types(bool_filt='', code_only=True):
+    #bool_filt: hit, baseRunningEvent, or plateAppearance
+    event_types = meta('eventTypes')
+    if bool_filt:
+        event_types = [x for x in event_types if x.get(bool_filt)]
+    if code_only:
+        event_types = [x['code'] for x in event_types]
+    return event_types

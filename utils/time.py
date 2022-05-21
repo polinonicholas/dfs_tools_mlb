@@ -24,3 +24,13 @@ def mlb_months(year):
         mlb_months[month].append(str(last_day.replace(day=1)))
         mlb_months[month].append(str(last_day))
     return mlb_months
+
+any_day = month_end(datetime.date(2012, 2, 1))
+
+
+
+next_month = any_day.replace(day=28) + datetime.timedelta(days=4)
+
+
+print(datetime.timedelta(days=4))
+mlb_months(2012)

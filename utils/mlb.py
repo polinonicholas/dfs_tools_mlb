@@ -26,3 +26,4 @@ def team_lineups():
             json.dump(team_lineups, file)
             file.close()
         return team_lineups
+    
