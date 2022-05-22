@@ -4,6 +4,7 @@ from statsapi import meta
 import logging
 import requests
 
+
 def full_schedule(
     date=None,
     start_date=None,
@@ -41,7 +42,7 @@ def full_schedule(
     params.update(
         {
             "sportId": str(sportId),
-            "fields": 'dates,date,games,gamePk,status,codedGameState,totalGames,totalGamesInProgress,seriesGameNumber'
+            "fields": "dates,date,games,gamePk,status,codedGameState,totalGames,totalGamesInProgress,seriesGameNumber",
         }
     )
 
@@ -52,15 +53,17 @@ def full_schedule(
         return games
     else:
         for date in r.get("dates"):
-                games.append(date)
+            games.append(date)
         return games
+
+
 BASE_URL = endpoints.BASE_URL
 """Base MLB Stats API URL"""
 ENDPOINTS = endpoints.ENDPOINTS
 """MLB Stats API endpoint configuration"""
 
 logger = logging.getLogger("statsapi")
-#indentical to statsapi.get except prints URL, retries 524 error 5 times, force=True.
+# indentical to statsapi.get except prints URL, retries 524 error 5 times, force=True.
 def get_big(endpoint, params, force=True):
     """Call MLB StatsAPI and return JSON data.
 
@@ -198,13 +201,13 @@ def get_big(endpoint, params, force=True):
         return r.json()
 
     return None
-    
 
-def event_types(bool_filt='', code_only=True):
-    #bool_filt: hit, baseRunningEvent, or plateAppearance
-    event_types = meta('eventTypes')
+
+def event_types(bool_filt="", code_only=True):
+    # bool_filt: hit, baseRunningEvent, or plateAppearance
+    event_types = meta("eventTypes")
     if bool_filt:
         event_types = [x for x in event_types if x.get(bool_filt)]
     if code_only:
-        event_types = [x['code'] for x in event_types]
+        event_types = [x["code"] for x in event_types]
     return event_types
