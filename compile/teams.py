@@ -752,27 +752,6 @@ class Team(metaclass=IterTeam):
             roster = roster.join(
                 h_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop"
             )
-            if settings.use_fangraphs:
-
-                def drop(df):
-                    df = df.loc[~df.duplicated(subset=["mlb_id"])]
-                    df = df[df["mlb_id"].isin(lineup_ids)]
-                    return df
-
-                from dfs_tools_mlb.compile.stats_fangraphs import Stats
-
-                fg_stats = Stats.current_stats()
-                h_df = sm_merge(
-                    h_df,
-                    fg_stats,
-                    columns=["name", "team"],
-                    ratios=[0.63, 1],
-                    prefix="m_",
-                    reset_index=False,
-                    post_drop=True,
-                    suffixes=("", "_fg"),
-                )
-                h_df = drop(h_df)
 
             if not self.custom_lineup:
                 h_df = h_df[
