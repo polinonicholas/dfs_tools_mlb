@@ -25,7 +25,7 @@ DL_FOLDER = "C:/Users/nicho/Downloads"
 FD_FILE_MATCH = DL_FOLDER + "/FanDuel-MLB*entries-upload-template*"
 FD_FILES = glob.glob(FD_FILE_MATCH)
 
-use_fangraphs = False
+
 OFFSEASON_TESTING = False
 wind_factor = True
 SEASON_WEIGHT_START = 2015

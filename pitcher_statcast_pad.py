@@ -128,6 +128,3 @@ def print_h_stats(player_id, year):
     print(filtered_hitter_plays.describe())
     return None
 
-
-print_p_stats(343434, 2022)
-print_h_stats(12123, 2022)
