@@ -127,4 +127,3 @@ def print_h_stats(player_id, year):
     ].reset_index()
     print(filtered_hitter_plays.describe())
     return None
-
