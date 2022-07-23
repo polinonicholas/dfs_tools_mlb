@@ -1,11 +1,14 @@
 from dfs_tools_mlb import settings
+
 settings.STORAGE_DIR.mkdir(exist_ok=True, parents=True)
 
 from dfs_tools_mlb.compile.historical_data import current_season
 from dfs_tools_mlb.utils.subclass import Map
+
 current_season = Map(current_season())
 
 from dfs_tools_mlb.utils.storage import clean_directory
+<<<<<<< HEAD
 clean_directory(settings.LINEUP_DIR, force_delete=False)
 clean_directory(settings.SP_DIR, force_delete=False)
 clean_directory(settings.BP_DIR, force_delete=False)
@@ -17,3 +20,17 @@ clean_directory(settings.GAME_DIR, force_delete=False)
 clean_directory(settings.SCHED_DIR, force_delete=False)
 clean_directory(settings.FD_DIR, force_delete=False)
 clean_directory(settings.STORAGE_DIR, force_delete=False)
+=======
+
+clean_directory(settings.LINEUP_DIR, force_delete=True)
+clean_directory(settings.SP_DIR, force_delete=True)
+clean_directory(settings.BP_DIR, force_delete=True)
+clean_directory(settings.NRI_DIR, force_delete=True)
+clean_directory(settings.ROSTER_DIR, force_delete=True)
+clean_directory(settings.DEPTH_DIR, force_delete=True)
+clean_directory(settings.GAME_DIR, force_delete=True)
+clean_directory(settings.GAME_DIR, force_delete=True)
+clean_directory(settings.SCHED_DIR, force_delete=True)
+clean_directory(settings.FD_DIR, force_delete=True)
+clean_directory(settings.STORAGE_DIR, force_delete=True)
+>>>>>>> 2ea6f77aedf99a2a74df8261214d2d0614ecc634

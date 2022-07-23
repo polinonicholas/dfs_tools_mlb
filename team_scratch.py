@@ -91,15 +91,3 @@ stack_salary_pairing_cutoff=2,
 high_pitcher_salary = 0
 low_pitcher_salary = 0
 median_team_salary=0
-
-0       Shohei Ohtani
-1          Mike Trout
-2         Jared Walsh
-3      Anthony Rendon
-4       Brandon Marsh
-5          Max Stassi
-6          Jose Rojas
-7          Tyler Wade
-8    Andrew Velazquez
-
-[660271, 545361, 665120, 543685, 669016, 435559, 642180, 642180, 664058]
