@@ -2,6 +2,8 @@ import dfs_tools_mlb
 import inspect
 from pathlib import Path
 import glob
+from dfs_tools_mlb.utils.storage import json_path, pickle_path
+from dfs_tools_mlb.utils.time import time_frames as tf
 
 # teams with postponed game, lowercase team name.
 ppd = []
@@ -24,6 +26,10 @@ VITAL_DIR_LIST = [BP_DIR, SCHED_DIR, LINEUP_DIR, GAME_DIR]
 DL_FOLDER = "C:/Users/nicho/Downloads"
 FD_FILE_MATCH = DL_FOLDER + "/FanDuel-MLB*entries-upload-template*"
 FD_FILES = glob.glob(FD_FILE_MATCH)
+
+daily_info_file = json_path(name=f"daily_info_{tf.today}", directory=STORAGE_DIR)
+team_lineups_file = json_path(name="team_lineups")
+
 
 
 OFFSEASON_TESTING = False
