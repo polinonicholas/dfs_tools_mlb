@@ -440,4 +440,3 @@ def historical_data(start, end=None):
         print(f"Data saved at {data_path}.")
         df = pd.DataFrame(season_data)
         return df
-
