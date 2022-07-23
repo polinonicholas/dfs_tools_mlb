@@ -2,7 +2,6 @@ import statsapi
 from functools import cached_property, lru_cache
 import re
 import pandas as pd
-from dfs_tools_mlb.utils.pd import sm_merge
 from dfs_tools_mlb.compile import current_season as cs
 from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
 from dfs_tools_mlb.compile.static_mlb import api_player_info_dict, api_pitcher_info_dict
@@ -25,6 +24,7 @@ from math import floor, ceil
 from pathlib import Path
 from dfs_tools_mlb.dataframes.stat_splits import h_splits, p_splits
 from dfs_tools_mlb.dataframes.stat_splits import adjustment_dfs as a_dfs
+
 class IterTeam(type):
     def __iter__(cls):
         return iter(cls._all_teams)
@@ -86,6 +86,14 @@ class Team(metaclass=IterTeam):
                 elif position in mac.players.bullpen:
                     info['bullpen'].append(player)   
         return info
+    @staticmethod
+    def pickle_dump(d, file):
+        try:
+            with open(file, "wb") as f:
+                pickle.dump(d, f)
+        except (FileNotFoundError, PermissionError):
+            print(f"Unable to save to {file}")
+            
         
     @cached_property
     def depth(self):
@@ -95,8 +103,7 @@ class Team(metaclass=IterTeam):
             depth = pd.read_pickle(path)
             return depth
         depth = Team.roster_dict(self, roster_type = 'depthChart', is_depth=True)
-        with open(file, "wb") as f:
-            pickle.dump(depth, f)
+        Team.pickle_dump(depth, file)
         return depth
     
     @cached_property
@@ -108,8 +115,7 @@ class Team(metaclass=IterTeam):
             return roster
         roster = Team.roster_dict(self, roster_type = '40Man')
         roster.extend(self.nri)
-        with open(file, "wb") as f:
-            pickle.dump(roster, f)
+        Team.pickle_dump(roster, file)
         return roster
     @cached_property
     def nri(self):
@@ -122,22 +128,17 @@ class Team(metaclass=IterTeam):
             nri = Team.roster_dict(self, roster_type = 'nonRosterInvitees')
         except KeyError:
             return []
-        with open(file, "wb") as f:
-            pickle.dump(nri, f)
+        Team.pickle_dump(nri, file)
         return nri
     #list of integers representing ids of every affiliated player.
     @cached_property
     def all_player_ids(self):
-        player_ids = []
-        for player in self.full_roster:
-            player_ids.append(player['mlb_id'])
-            # [x['mlb_id'] for x in self.full_roster]
-        return player_ids
+        return [player['mlb_id'] for player in self.full_roster]
     @lru_cache
-    def batters(self, active=False):
+    def batters(self, active_players_only=False):
         roster = pd.DataFrame(self.full_roster)
         batters = roster[roster['h'] == True]
-        if active:
+        if active_players_only:
             batters = batters[batters['status'] == 'A']
         batters = batters.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
         return batters
@@ -262,8 +263,7 @@ class Team(metaclass=IterTeam):
             schedule = pd.read_pickle(path)
         else:
             schedule = full_schedule(team=self.id, start_date=cs.spring_start, end_date=cs.playoff_end)
-            with open(file, "wb") as f:
-                pickle.dump(schedule, f)
+            Team.pickle_dump(schedule, file)
         return schedule
     def clear_team_cache(self, directories):
         for d in directories:
@@ -320,13 +320,12 @@ class Team(metaclass=IterTeam):
         if path.exists():
             game = pd.read_pickle(path)
             return game
-            if not game['gameData']['game']['doubleHeader'] == 'Y' and game['gameData']['gameNumber'] == 1:
-                return game
+            # if not game['gameData']['game']['doubleHeader'] == 'Y' and game['gameData']['gameNumber'] == 1:
+            #     return game
         if self.last_game_pk:
             print(f"Getting boxscore {self.name.capitalize()}' last game.")
             game =  statsapi.get('game', {'gamePk': self.last_game_pk})
-            with open(file, "wb") as f:
-                pickle.dump(game, f)
+            Team.pickle_dump(game, file)
             return game
         return self.last_game_pk
     
@@ -391,9 +390,7 @@ class Team(metaclass=IterTeam):
                 daily_info = Team.daily_info()
                 if self.opp_name not in daily_info["confirmed_sp"]:
                     daily_info["confirmed_sp"].append(self.opp_name)
-                    file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                    with open(file, "w+") as f:
-                        json.dump(daily_info, f)
+                    Team.dump_json_data(settings.daily_info_file, daily_info)
                 self.opp_instance.cache_next_game()
                 return sp_info
             except KeyError:
@@ -421,12 +418,12 @@ class Team(metaclass=IterTeam):
                 sp_info = self.next_game['gameData']['players'][sp_id]
                 if self.name not in daily_info["confirmed_sp"]:
                     daily_info["confirmed_sp"].append(self.name)
-                    file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                    with open(file, "w+") as f:
-                        json.dump(daily_info, f)
+                    Team.dump_json_data(settings.daily_info_file, daily_info)
                 self.cache_next_game()
                 return sp_info
             except KeyError:
+                daily_info["auto_projected_sp"].append(self.name)
+                Team.dump_json_data(settings.daily_info_file, daily_info)
                 starters = self.rested_sp()
                 try:
                     projected_sp = starters.loc[starters['fd_ps_s'].idxmax()]
@@ -478,9 +475,8 @@ class Team(metaclass=IterTeam):
     
     @staticmethod
     def lineups():
-        path = json_path(name='team_lineups')
         try:
-            with open(path) as file:
+            with open(settings.team_lineups_file) as file:
                 team_lineups = json.load(file)
                 file.close()
             return team_lineups
@@ -488,9 +484,7 @@ class Team(metaclass=IterTeam):
             team_lineups = {}
             for team in team_info.keys():
                 team_lineups[team] = {'L': [], 'R': []}
-            with open(path, "w+") as file:
-                json.dump(team_lineups, file)
-                file.close()
+            Team.dump_json_data(settings.team_lineups_file, team_lineups)
             return team_lineups
     @staticmethod
     def daily_info():
@@ -503,14 +497,20 @@ class Team(metaclass=IterTeam):
                 "confirmed_lu": [],
                 "confirmed_sp": [],
                 "rain": [],
+                "auto_projected_sp": []
                 }
             with open(file, "w+") as f:
                 json.dump(daily_info, f)
         return daily_info
     @staticmethod
-    def drop(df,filt):
+    def dump_json_data(file, json_data):
+        with open(file, "w+") as f:
+            json.dump(json_data, f)
+        return "Dumped daily info."
+    @staticmethod
+    def drop(df,iter_filt):
         df = df.loc[~df.duplicated(subset=['mlb_id'])]
-        df = df[df['mlb_id'].isin(filt)]
+        df = df[df['mlb_id'].isin(iter_filt)]
         return df
     @staticmethod
     def default_sp():
@@ -539,9 +539,7 @@ class Team(metaclass=IterTeam):
                 self.update_lineup(lineup, self.opp_sp_hand)
                 if self.name not in daily_info["confirmed_lu"]:
                     daily_info["confirmed_lu"].append(self.name)
-                    file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-                    with open(file, "w+") as f:
-                        json.dump(daily_info, f)
+                    Team.dump_json_data(settings.daily_info_file, daily_info)
                 self.cache_next_game()
                 return lineup
             else:
@@ -654,15 +652,15 @@ class Team(metaclass=IterTeam):
             merged = pd.merge(lineup, roster, on="mlb_id")
             h_df = merged.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
             roster = roster.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
-            if settings.use_fangraphs:
-                def drop(df):
-                    df = df.loc[~df.duplicated(subset=['mlb_id'])]
-                    df = df[df['mlb_id'].isin(lineup_ids)]
-                    return df
-                from dfs_tools_mlb.compile.stats_fangraphs import Stats
-                fg_stats = Stats.current_stats()
-                h_df = sm_merge(h_df, fg_stats, columns=['name', 'team'], ratios=[.63, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('', '_fg'))
-                h_df = drop(h_df)
+            # if settings.use_fangraphs:
+            #     def drop(df):
+            #         df = df.loc[~df.duplicated(subset=['mlb_id'])]
+            #         df = df[df['mlb_id'].isin(lineup_ids)]
+            #         return df
+            #     from dfs_tools_mlb.compile.stats_fangraphs import Stats
+            #     fg_stats = Stats.current_stats()
+            #     h_df = sm_merge(h_df, fg_stats, columns=['name', 'team'], ratios=[.63, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('', '_fg'))
+            #     h_df = drop(h_df)
             
             if not self.custom_lineup:
                 h_df = h_df[~((h_df['position'].astype(str).isin(mac.players.p)) & (h_df['mlb_id'] != 660271))]
@@ -894,9 +892,7 @@ class Team(metaclass=IterTeam):
             h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
             h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
             h_df['points'] = h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points'] + h_df['exp_ps_raw']
-            
-            with open(file, "wb") as f:
-                pickle.dump(h_df, f)
+            Team.pickle_dump(h_df, file)
         else:
             h_df = pd.read_pickle(path)
             lefties = Team.get_split_players(h_df, 'L')
@@ -957,8 +953,7 @@ class Team(metaclass=IterTeam):
         p_df['env_points'] = self.env_avg
         
         if self.name in daily_info['confirmed_sp']:
-            with open(file, "wb") as f:
-                pickle.dump(p_df, f)
+            Team.pickle_dump(p_df, file)
         return p_df
     
     def live_game(self):
@@ -1148,12 +1143,10 @@ class Team(metaclass=IterTeam):
         if self.weather:
             condition = self.weather.get('condition')
             if condition in mac.weather.rain:
-                file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
                 daily_info = Team.daily_info()
                 if self.name not in daily_info["rain"]:
                     daily_info["rain"].append(self.name)
-                    with open(file, "w+") as f:
-                        json.dump(daily_info, f)
+                    Team.dump_json_data(settings.daily_info_file, daily_info)
         return condition
     @cached_property
     def venue_temp(self):
@@ -1327,7 +1320,8 @@ class Team(metaclass=IterTeam):
             else:
                 stop = 1000
             while count < stop:
-                df = data[data['temp'].between(temp - mult, temp + mult, inclusive=False)]
+                print(self.name)
+                df = data[data['temp'].between(temp - mult, temp + mult, inclusive='neither')]
                 count = len(df.index)
                 mult += 1
             return df['fd_points'].mean() / game_data['fd_points'].mean()
@@ -1344,9 +1338,14 @@ class Team(metaclass=IterTeam):
             else:
                 stop = 1000
             while count < stop:
-                df = data[data['temp'].between(temp - mult, temp + mult, inclusive=False)]
+                print(len(data.index))
+                print(temp)
+                df = data[data['temp'].between(temp - mult, temp + mult, inclusive='neither')]
+                print(len(df.index))
                 count = len(df.index)
                 mult += 1
+            print('made it out of loop')
+            print(df['fd_points'].mean())
             return df['fd_points'].mean()
         return game_data['fd_points'].mean()
     @staticmethod
@@ -1440,8 +1439,7 @@ class Team(metaclass=IterTeam):
             bp['fd_wpa_b_rp'] = bp['fd_wpa_b_rp'] * settings.TIRED_BP_INCREASE
             bp['fd_wpa_b_vr'] = bp['fd_wpa_b_vr'] * settings.TIRED_BP_INCREASE
             bp['fd_wpa_b_vl'] = bp['fd_wpa_b_vl'] * settings.TIRED_BP_INCREASE
-        with open(file, "wb") as f:
-            pickle.dump(bp, f)
+        Team.pickle_dump(bp, file)
         return bp
     @cached_property
     def rested_bullpen(self):
@@ -1452,8 +1450,7 @@ class Team(metaclass=IterTeam):
             return bp
         bp = self.bullpen
         bp = bp[(~bp['mlb_id'].isin(self.used_rp)) & (bp['status'] == 'A')]
-        with open(file, "wb") as f:
-            pickle.dump(bp, f)
+        Team.pickle_dump(bp, file)
         return bp
         
     @cached_property
@@ -1515,8 +1512,7 @@ class Team(metaclass=IterTeam):
             n = self.name
             if n in di["confirmed_lu"] and n in di["confirmed_sp"]:
                 game = self.next_game
-                with open(file, "wb") as f:
-                    pickle.dump(game, f)
+                Team.pickle_dump(game, file)
                 print(f"Cached {self.name} next game.")
         return None
 
@@ -1623,4 +1619,3 @@ tigers = Team(mlb_id = 116, name = 'tigers')
 twins = Team(mlb_id = 142, name = 'twins')
 white_sox = Team(mlb_id = 145, name = 'white sox')
 yankees = Team(mlb_id = 147, name = 'yankees')
-
