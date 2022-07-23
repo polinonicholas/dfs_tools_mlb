@@ -10,7 +10,7 @@ import re
 """
 seasons: list of years (e.g. [2020])
 player_group: 'hitting' or 'pitching'
-player_ids: list, string (e.g. '12345,67890'), or integer - 404 error if single id does not exist.
+player_ids: list, string (e.g. '595777'), or integer - 404 error if single id does not exist.
 """
 
 
@@ -78,6 +78,10 @@ def get_statcast_longterm(seasons=[], player_group="", player_ids=[]):
             all_players.extend(season_players)
     return all_players
 
+<<<<<<< HEAD
+# test = get_statcast_longterm([2021, 2022], player_ids='595777', player_group='hitter')
+=======
+>>>>>>> 2ea6f77aedf99a2a74df8261214d2d0614ecc634
 
 def get_statcast_h(player_id, season):
     plays = []
@@ -120,6 +124,12 @@ def get_statcast_h(player_id, season):
     return df
 
 
+<<<<<<< HEAD
+
+
+
+=======
+>>>>>>> 2ea6f77aedf99a2a74df8261214d2d0614ecc634
 def get_statcast_p(player_id, season):
     plays = []
     play_ids = set()
