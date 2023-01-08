@@ -11,3 +11,4 @@ def get_fd_file(DL_FOLDER=settings.DL_FOLDER):
         return FD_FILE
     except ValueError:
         return f"There are no fanduel entries files in specified DL_FOLDER: {DL_FOLDER}, obtain one at fanduel.com/upcoming"
+

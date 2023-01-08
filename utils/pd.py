@@ -108,3 +108,7 @@ def sm_merge_single(
     if post_drop:
         df.drop(columns=merge_column, inplace=True)
     return df
+    
+
+def numeric_df(list_of_dict):
+        return pd.DataFrame(list_of_dict).apply(pd.to_numeric, errors="ignore")

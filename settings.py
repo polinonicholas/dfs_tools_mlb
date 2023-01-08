@@ -2,11 +2,22 @@ import dfs_tools_mlb
 import inspect
 from pathlib import Path
 import glob
-from dfs_tools_mlb.utils.storage import json_path, pickle_path
+
+
 from dfs_tools_mlb.utils.time import time_frames as tf
 
 # teams with postponed game, lowercase team name.
 ppd = []
+current_fd_slate_number = 1
+reset_all_lineups = True
+reset_specific_lineups = ()
+reset_all_team_vars = True
+reset_team_vars = ()
+reset_all_pitchers = True
+reset_specific_pitchers = []
+
+
+
 
 BASE_DIR = Path(inspect.getfile(dfs_tools_mlb)).resolve().parent
 STORAGE_DIR = Path(BASE_DIR, "compile", "storage").resolve()
@@ -27,52 +38,63 @@ DL_FOLDER = "C:/Users/nicho/Downloads"
 FD_FILE_MATCH = DL_FOLDER + "/FanDuel-MLB*entries-upload-template*"
 FD_FILES = glob.glob(FD_FILE_MATCH)
 
-daily_info_file = json_path(name=f"daily_info_{tf.today}", directory=STORAGE_DIR)
-team_lineups_file = json_path(name="team_lineups")
+daily_info_file = str(STORAGE_DIR.joinpath(f"daily_info_{tf.today}.json"))
+team_lineups_file = str(ARCHIVE_DIR.joinpath("team_lineups.json"))
+
 
 
 
 OFFSEASON_TESTING = False
 wind_factor = True
-SEASON_WEIGHT_START = 2015
+#Year to first include in average of weighted run stats.
+SEASON_WEIGHT_START = 2016
 INDOOR_TEMP = 72
 INDOOR_WIND = 0
 MIN_PA_VENUE = 5000
 MIN_PA_UMP = 500
 # Hitters given median stats if in lineup with fewer PA.
-MIN_PA_HITTER = 50
-MIN_PA_HITTER_SPLIT = 25
-MIN_BF_PITCHER = 50
-MIN_BF_PITCHER_SPLIT = 25
-MIN_BF_BP = 50
-MIN_BF_BP_SPLIT = 25
-STATS_TO_ADJUST_H = ("pitches_pa", "fd_wps_pa", "fd_wpa_pa", "k_pa", "fd_hr_weight")
-STATS_TO_ADJUST_P = ("k_b", "fd_wpa_b", "fd_wps_b", "ra-_b", "ppb")
+MIN_PA_HITTER = 100
+MIN_PA_HITTER_SPLIT = 50
+MIN_BF_SP = 100
+MIN_BF_SP_SPLIT = 50
+MIN_BF_BP = 100
+MIN_BF_BP_SPLIT = 50
+STATS_TO_ADJUST_H = ("pitches_pa", "fd_wps_pa", "fd_wpa_pa", "k_pa", "fd_hr_weight", "rb-_pa")
+STATS_TO_ADJUST_SP = ("k_b", "fd_wpa_b", "fd_wps_b", "ra-_b", "ppb")
 STATS_TO_ADJUST_RP = ("fd_wpa_b", "ra-_b")
-MIN_GAMES_VENUE_WIND = 50
-STACK_KEY_1 = "points"
+PROJECTED_SP_COLUMN = "fd_ps_s"
+MIN_GAMES_VENUE_WIND = 100
+#Fanduel lineup builder consants
+STACK_KEY_1 = "sp_split"
 STACK_KEY_2 = "sp_split"
 PITCHER_REPLACE_KEY_1 = "points"
-PITCHER_REPLACE_KEY_2 = "k_pred"
-FD_NON_STACK_KEY_1 = "fd_salary"
-FD_NON_STACK_KEY_2 = "fd_hr_weight"
+PITCHER_REPLACE_KEY_2 = "points"
+FD_NON_STACK_KEY_1 = "sp_split"
+FD_NON_STACK_KEY_2 = "sp_split"
 
-RESTED_BP_SAMP = 4
-TIRED_BP_INCREASE = 1.075
+FD_PLAYER_RANK_COLS = ["name", "points", "exp_ps_sp_pa", "sp_split", "fd_salary",
+                       "fd_id", "mlb_id", "team", "fd_injury_d", "is_platoon",
+                       "venue_points",  "total_pitches", "bat_side", "order"]
+
+RESTED_BP_SAMP = 3
+TIRED_BP_INCREASE = 1.10
 MIN_UMP_SAMP = 100
 
 
 P_PTS_WEIGHT = 0.5
 H_PTS_WEIGHT = 0.5
-if P_PTS_WEIGHT + H_PTS_WEIGHT != 1:
-    P_PTS_WEIGHT = 0.5
-    H_PTS_WEIGHT = 0.5
 
 P_K_WEIGHT = 0.5
 H_K_WEIGHT = 0.5
-if P_K_WEIGHT + H_K_WEIGHT != 1:
-    P_K_WEIGHT = 0.5
-    H_K_WEIGHT = 0.5
+
+P_HITS_ALLOWED_WEIGHT = .5
+H_HITS_ALLOWED_WEIGHT = .5
+ENV_TEMP_WEIGHT = .3 
+ENV_VENUE_WEIGHT = .5 
+ENV_UMP_WEIGHT = .2
+
+P_PIT_PER_BAT_WEIGHT = .5
+H_PIT_PER_BAT_WEIGHT = .5
 
 
 LU_LENGTH = 9
@@ -110,6 +132,8 @@ stat_range = {
     "end": 2023,
     # currently, must manually change _year columns in dataframes.stat_splits for pitchers
     "player_start": 2021,
+    "pitcher_start": 2022,
+    "hitter_start": 2021
 }
 
 fd_scoring = {
@@ -124,3 +148,10 @@ api_hydrate = {
 api_fields = {
     "get_historical_data": "dates,date,games,status,codedGameState,weather,condition,temp,wind,linescore,teams,home,away,runs,hits,currentInning,venue,id,dayNight,seriesGameNumber,officials,gamePk,probablePitcher,scoringPlays,result,event"
 }
+
+daily_info_dict = {
+                "confirmed_lu": [],
+                "confirmed_sp": [],
+                "rain": [],
+                "auto_projected_sp": []
+                }

@@ -1,27 +1,30 @@
-import statsapi
 from functools import cached_property, lru_cache
 import re
 import pandas as pd
-from dfs_tools_mlb.compile import current_season as cs
+import json
+from json import JSONDecodeError
+import numpy as np
+import pickle
+import datetime
+from math import floor, ceil
+from pathlib import Path
+
+import statsapi
+
+from dfs_tools_mlb.compile import current_season as cs, cs_yr
 from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
 from dfs_tools_mlb.compile.static_mlb import api_player_info_dict, api_pitcher_info_dict
 from dfs_tools_mlb.utils.statsapi import full_schedule
 from dfs_tools_mlb.utils.storage import json_path
-import json
 from dfs_tools_mlb.compile.static_mlb import team_info
-from json import JSONDecodeError
 from dfs_tools_mlb.utils.strings import plural
 from dfs_tools_mlb.utils.time import time_frames as tf
+from dfs_tools_mlb.utils.pd import numeric_df
 from dfs_tools_mlb.dataframes.game_data import game_data
 from dfs_tools_mlb.dataframes.venue_data import qualified_venue_stats, venue_data
-from dfs_tools_mlb.utils.storage import pickle_path
+from dfs_tools_mlb.utils.storage import pickle_path, pickle_dump
 from dfs_tools_mlb.utils.strings import ids_string
-import numpy as np
-import pickle
-import datetime
 from dfs_tools_mlb import settings
-from math import floor, ceil
-from pathlib import Path
 from dfs_tools_mlb.dataframes.stat_splits import h_splits, p_splits
 from dfs_tools_mlb.dataframes.stat_splits import adjustment_dfs as a_dfs
 
@@ -30,36 +33,42 @@ class IterTeam(type):
     def __iter__(cls):
         return iter(cls._all_teams)
 
-
 class Team(metaclass=IterTeam):
     _all_teams = []
 
     def __init__(
         self,
         mlb_id,
-        name="",
-        custom_lineup=None,
-        custom_sp=None,
-        ppd=False,
-        custom_pps=None,
-        custom_temp=None,
-        custom_wind_direction=None,
-        custom_wind_speed=None,
+        name=""
     ):
         self._all_teams.append(self)
         self.id = mlb_id
         self.name = name
-        self.custom_lineup = custom_lineup
-        self.custom_sp = custom_sp
-        self.custom_pps = custom_pps
-        self.custom_temp = custom_temp
-        self.custom_wind_direction = custom_wind_direction
-        self.custom_wind_speed = custom_wind_speed
-        # self.file = Path(f"{settings.TEAM_DIR.joinpath(self.name)}.py")
+        self.file = Path(f"{settings.TEAM_DIR.joinpath(self.name)}.json")
+        try:
+            with open(self.file) as f:
+                self.team_vars = json.load(f)
+        except (FileNotFoundError, JSONDecodeError, PermissionError):
+
+            self.team_vars = {"custom_lineup": None,
+             "custom_sp": None,
+             "custom_pps": None,
+             "ppd": False,
+             "custom_temp": None,
+             "custom_wind_speed": None,
+             "custom_wind_direction": None}
+        
+        self.custom_lineup = self.team_vars["custom_lineup"]
+        self.custom_sp = self.team_vars["custom_sp"]
+        self.custom_pps = self.team_vars["custom_pps"]
+        self.custom_temp = self.team_vars["custom_temp"]
+        self.custom_wind_speed = self.team_vars["custom_wind_speed"]
+        self.custom_wind_direction = self.team_vars["custom_wind_direction"]
+        
         if self.name in settings.ppd:
             self.ppd = True
         else:
-            self.ppd = ppd
+            self.ppd = self.team_vars["ppd"]
 
     @staticmethod
     def roster_dict(instance, roster_type, is_depth=False):
@@ -101,13 +110,188 @@ class Team(metaclass=IterTeam):
         return info
 
     @staticmethod
-    def pickle_dump(d, file):
+    def join_player_stats(df1, col="mlb_id", hitters=True):
+        """
+        """
+        if hitters:
+            return df1.join(h_splits.set_index(column), on=col, rsuffix='_drop')
+        else:
+            return df1.join(p_splits.set_index(column), on=col, rsuffix='_drop')
+    
+    @staticmethod
+    def get_player_api(player_id):
+        return statsapi.get("people", {"personIds": player_id})["people"][0]
+
+    @staticmethod
+    def get_game_api(game_id):
+        return statsapi.get("game", {"gamePk": game_id})
+
+    @staticmethod
+    def dump_json_data(file, json_data):
         try:
-            with open(file, "wb") as f:
-                pickle.dump(d, f)
-        except (FileNotFoundError, PermissionError):
-            print(f"Unable to save to {file}")
+            with open(file, "w+") as f:
+                json.dump(json_data, f)
+            return "Dumped daily info."
+        except PermissionError:
+            return "Could not dump data due to permission error."
+
+    @staticmethod
+    def lineups():
+        try:
+            with open(settings.team_lineups_file) as file:
+                team_lineups = json.load(file)
+                file.close()
+            return team_lineups
+        except (FileNotFoundError, JSONDecodeError, PermissionError):
+            team_lineups = {}
+            for team in team_info.keys():
+                team_lineups[team] = {'L': [], 'R': []}
+            Team.dump_json_data(settings.team_lineups_file, team_lineups)
+            return team_lineups
+
+    @staticmethod
+    def daily_info():
+        file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
+        daily_info = settings.daily_info_dict
+        try:
+            try:
+                with open(file) as f:
+                    daily_info = json.load(f)
+            except (FileNotFoundError, JSONDecodeError):
+                with open(file, "w+") as f:
+                    json.dump(daily_info, f)
+        except PermissionError:
+            pass
+        return daily_info
+
+    @staticmethod
+    def default_sp():
+        df = a_dfs["P"]["SP"]["RAW"]["raw"]
+        empty = df[df["mlb_id"] == 0]
+        defaults = df.median()
+        empty = empty.append(defaults, ignore_index=True)
+        empty["name"] = "Unknown"
+        empty["pitch_hand"] = "R"
+        return empty
+
+    @staticmethod
+    def get_split_filter(df, hand, pitchers=False, return_percentage=False):
+       
+        if not pitchers:
+            split = "bat_side"
+        else:
+            split = "pitch_hand"
+        filt = df[split] == hand.upper()
+        if return_percentage:
+            split_length = len(df[filt].index)
+            return split_length / settings.LU_LENGTH
+        return filt
+
+    @staticmethod
+    def non_rested_teams(travel_only=True):
+        no_rest = {"away": set(), "home": set()}
+        for t in Team:
+            if not t.no_rest:
+                continue
+            if travel_only:
+                if t.no_rest_travel and t.is_home:
+                    no_rest["home"].add(t.name)
+                elif t.no_rest_travel and not t.is_home:
+                    no_rest["away"].add(t.name)
+            else:
+                if not t.no_rest:
+                    continue
+                if t.no_rest and t.is_home:
+                    no_rest["home"].add(t.name)
+                elif t.no_rest and not t.is_home:
+                    no_rest["away"].add(t.name)
+        return no_rest
+
+    @staticmethod
+    def adjust_non_qualified_p(df, bullpen = False, base="batters_faced"):
+        l_filt = Team.get_split_filter(df, "L", pitchers=True)
+        r_filt = Team.get_split_filter(df, "R", pitchers=True)
+        if not bullpen:
+            min_bf = MIN_BF_SP
+            min_bf_sp = settings.MIN_BF_SP_SPLIT
+            stats = settings.STATS_TO_ADJUST_SP
+            p_col = "_sp"
+            a_dfs_branch = a_dfs["P"]["SP"]
+        else:
+            min_bf = MIN_BF_BP
+            min_bf_sp = setting.MIN_BF_BP_SPLIT
+            stats = settings.STATS_TO_ADJUST_RP
+            p_col = "_rp"
+            a_dfs_branch = a_dfs["P"]["BP"]
+        for stat in stats:
+            medians_vs = {
+                ("r", "r"): a_dfs_branch["R"]["vs_r"][stat + "_vr"].median(),
+                ("l", "l"): a_dfs_branch["L"]["vs_l"][stat + "_vl"].median(),
+                ("l", "r"): a_dfs_branch["L"]["vs_r"][stat + "_vr"].median(),
+                ("r", "l"): a_dfs_branch["R"]["vs_l"][stat + "_vl"].median(),
+                ("_", "_"): a_dfs_branch["RAW"]["raw"][stat + "_rp"].median()
+                        }
+            vl_filt = ((df[base + "_vl"] < min_bf_sp) | (df[stat + "_vl"].isna()))
+            vr_filt = ((df[base + "_vr"] < min_bf_sp) | (df[stat + "_vr"].isna()))
+            raw_filt = ((df[base + p_col] < min_bf) | (df[stat + p_col].isna()))
+            df.loc[vr_filt & r_filt, stat + "_vr"] = medians_vs[("r", "r")]
+            df.loc[vl_filt & l_filt, stat + "_vl"] = medians_vs[("l", "l")]
+            df.loc[vr_filt & l_filt, stat + "_vr"] = medians_vs[("l", "r")]
+            df.loc[vl_filt & r_filt, stat + "_vl"] = medians_vs[("r", "l")]
+            df.loc[raw_filt, stat + p_col] = medians_vs[("_", "_")]
+
+        return df
+
+    def adjust_non_qualified_h(df, base="pa"):
+
+        l_filt = Team.get_split_filter(df, "L")
+        r_filt = Team.get_split_filter(df, "R")
+        min_pa = settings.MIN_PA_HITTER
+        min_pa_sp = settings.MIN_PA_HITTER_SPLIT
+        for stat in settings.STATS_TO_ADJUST_H:
+            medians_vs = {
+                ("r", "r"): a_dfs["H"]["R"]["vs_r"][stat + "_vr"].median(),
+                ("l", "l"): a_dfs["H"]["L"]["vs_l"][stat + "_vl"].median(),
+                ("l", "r"): a_dfs["H"]["L"]["vs_r"][stat + "_vr"].median(),
+                ("r", "l"): a_dfs["H"]["R"]["vs_l"][stat + "_vl"].median(),
+                ("_", "_"): a_dfs["H"]["RAW"]["hitters"][stat].median()
+                        }
+            vl_filt = ((df[base + "pa_vl"] < min_pa_sp) | (df[stat + "_vl"].isna()))
+            vr_filt = ((df[base + "_vr"] < min_pa_sp) | (df[stat + "_vr"].isna()))
+            raw_filt = ((df[base] < min_pa) | (df[stat].isna()))
+            df.loc[vr_filt & r_filt, base + "_vr",] = medians_vs[("r", "r")]
+            df.loc[vl_filt & l_filt, base + "_vl",] = medians_vs[("l", "l")]
+            df.loc[vr_filt & l_filt, base + "_vr",] = medians_vs[("l", "r")]
+            df.loc[vl_filt & r_filt, base + "_vl",] = medians_vs[("r", "l")]
+            df.loc[raw_filt, stat] = medians_vs[("_", "_")]
             
+        return df
+
+    @staticmethod
+    def update_daily_info(current_daily_info, to_update, update_with):
+        ##TODO check for permission when instance created
+        current_daily_info[to_update].append(update_with)
+        Team.dump_json_data(settings.daily_info_file, current_daily_info)
+
+    @staticmethod
+    def get_game_officials(game):
+        return game["liveData"]["boxscore"]["officials"]
+
+    @staticmethod
+    def get_official_id(official):
+        return official["official"]["id"]
+
+    @staticmethod
+    def get_official(game, ump_type, return_id = True):
+        officials = Team.get_game_officials(game)
+        try:
+            ump = next(o for o in officials if o["officialType"] == ump_type)
+            if return_id:
+                return Team.get_official_id(ump)
+            else:
+                return ump
+        except StopIteration:
+            return "Unable to project ump."
         
     @cached_property
     def depth(self):
@@ -117,10 +301,9 @@ class Team(metaclass=IterTeam):
         path = settings.DEPTH_DIR.joinpath(file)
         if path.exists():
             depth = pd.read_pickle(path)
-            return depth
-
-        depth = Team.roster_dict(self, roster_type = 'depthChart', is_depth=True)
-        Team.pickle_dump(depth, file)
+        else:
+            depth = Team.roster_dict(self, roster_type = 'depthChart', is_depth=True)
+            pickle_dump(depth, file)
         return depth
 
     @cached_property
@@ -131,10 +314,10 @@ class Team(metaclass=IterTeam):
         path = settings.ROSTER_DIR.joinpath(file)
         if path.exists():
             roster = pd.read_pickle(path)
-            return roster
-        roster = Team.roster_dict(self, roster_type="40Man")
-        roster.extend(self.nri)
-        Team.pickle_dump(roster, file)
+        else:
+            roster = Team.roster_dict(self, roster_type="40Man")
+            roster.extend(self.nri)
+            pickle_dump(roster, file)
         return roster
 
     @cached_property
@@ -145,100 +328,93 @@ class Team(metaclass=IterTeam):
         path = settings.NRI_DIR.joinpath(file)
         if path.exists():
             nri = pd.read_pickle(path)
-            return nri
-        try:
-            nri = Team.roster_dict(self, roster_type="nonRosterInvitees")
-        except KeyError:
-            return []
-        Team.pickle_dump(nri, file)
+        else:
+            try:
+                nri = Team.roster_dict(self, roster_type="nonRosterInvitees")
+                pickle_dump(nri, file)
+            except KeyError:
+                return []
         return nri
 
     # list of integers representing ids of every affiliated player.
     @cached_property
     def all_player_ids(self):
-
         return [player['mlb_id'] for player in self.full_roster]
 
     @lru_cache
     def batters(self, active_players_only=False):
         roster = pd.DataFrame(self.full_roster)
-
         batters = roster[roster['h'] == True]
         if active_players_only:
             batters = batters[batters['status'] == 'A']
-        batters = batters.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
+        return Team.join_player_stats(batters)
 
-        return batters
 
     @cached_property
     def hitter(self):
-        hitters = pd.DataFrame(self.depth["hitters"]).apply(
-            pd.to_numeric, errors="ignore"
-        )
+        hitters = numeric_df(self.depth["hitters"])
         hitters["h"] = True
-        hitters = hitters.join(
-            h_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop"
-        )
-        return hitters
+        return Team.join_player_stats(hitters)
 
     @cached_property
     def starter(self):
-        starters = pd.DataFrame(self.depth["starters"]).apply(
-            pd.to_numeric, errors="ignore"
-        )
+        starters = numeric_df(self.depth["starters"])
         starters = starters[starters["status"] == "A"]
-        starters = starters.join(
-            p_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop"
-        )
+        starters = Team.join_player_stats(starters, hitters=False)
         starters["p"] = True
         return starters
 
     @cached_property
     def bullpen(self):
-        bullpen = pd.DataFrame(self.depth["bullpen"]).apply(
-            pd.to_numeric, errors="ignore"
-        )
-        bullpen = bullpen.join(
-            p_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop"
-        )
+        bullpen = numeric_df(self.depth["bullpen"])
+        bullpen = Team.join_player_stats(bullpen, hitters=False)
         bullpen["p"] = True
         return bullpen
 
     @cached_property
     def catcher(self):
-        return self.hitter[self.hitter["position"].astype("int") == 2]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["c"]
+]
 
     @cached_property
     def first_base(self):
-        return self.hitter[self.hitter["position"].astype("int") == 3]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["1b"]
+]
 
     @cached_property
     def second_base(self):
-        return self.hitter[self.hitter["position"].astype("int") == 4]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["2b"]
+]
 
     @cached_property
     def third_base(self):
-        return self.hitter[self.hitter["position"].astype("int") == 5]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["3b"]
+]
 
     @cached_property
     def shorstop(self):
-        return self.hitter[self.hitter["position"].astype("int") == 6]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["ss"]
+]
 
     @cached_property
     def left_field(self):
-        return self.hitter[self.hitter["position"].astype("int") == 7]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["lf"]
+]
 
     @cached_property
     def center_field(self):
-        return self.hitter[self.hitter["position"].astype("int") == 8]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["cf"]
+]
 
     @cached_property
     def right_field(self):
-        return self.hitter[self.hitter["position"].astype("int") == 9]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["rf"]
+]
 
     @cached_property
     def dh(self):
-        return self.hitter[self.hitter["position"].astype("int") == 10]
+        return self.hitter[self.hitter["position"].astype("int") == mac.players["dh"]
+]
 
     @cached_property
     def infield(self):
@@ -257,11 +433,11 @@ class Team(metaclass=IterTeam):
         pitchers = self.starter.combine_first(self.bullpen)
         return pitchers
 
+
     @cached_property
     def coaches(self):
-        data = statsapi.get("team_roster", {"teamId": self.id, "rosterType": "coach"})[
-            "roster"
-        ]
+        ## TODO functin to get coaches, coach dict in mlb_static.py
+        data = statsapi.get("team_roster", {"teamId": self.id, "rosterType": "coach"})["roster"]
         coaches = []
         for c in data:
             coach = {
@@ -310,13 +486,11 @@ class Team(metaclass=IterTeam):
         if path.exists():
             schedule = pd.read_pickle(path)
         else:
-
             schedule = full_schedule(team=self.id, start_date=cs.spring_start, end_date=cs.playoff_end)
-            Team.pickle_dump(schedule, file)
-
+            pickle_dump(schedule, file)
         return schedule
 
-    def clear_team_cache(self, directories):
+    def clear_team_cache(self, directories=settings.VITAL_DIR_LIST):
         for d in directories:
             for file in Path.iterdir(d):
                 if not file.is_dir() and self.name in str(file):
@@ -329,19 +503,15 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def future_games(self):
-        return [
-            x
-            for x in self.all_games
-            if x["games"][0]["status"]["codedGameState"] in mac.game_status.pre
-        ]
+        games = self.all_games
+        pre = mac.game_status.pre
+        return [g for g in games if g["games"][0]["status"]["codedGameState"] in pre]
 
     @cached_property
-    def past_games(self):
-        return [
-            x
-            for x in self.all_games
-            if x["games"][0]["status"]["codedGameState"] in mac.game_status.post
-        ]
+    def past_games(self): 
+        games = self.all_games
+        past = mac.game_status.post
+        return [g for g in games if g["games"][0]["status"]["codedGameState"] in past]
 
     @cached_property
     def next_game_pk(self):
@@ -370,7 +540,7 @@ class Team(metaclass=IterTeam):
                 game = pd.read_pickle(path)
             else:
                 print(f"Getting boxscore for {self.name.capitalize()}' next game.")
-                game = statsapi.get("game", {"gamePk": self.next_game_pk})
+                game = Team.get_game_api(self.next_game_pk)
             return game
         return self.next_game_pk
 
@@ -389,8 +559,8 @@ class Team(metaclass=IterTeam):
             #     return game
         if self.last_game_pk:
             print(f"Getting boxscore {self.name.capitalize()}' last game.")
-            game =  statsapi.get('game', {'gamePk': self.last_game_pk})
-            Team.pickle_dump(game, file)
+            game = Team.get_game_api(self.last_game_pk)
+            pickle_dump(game, file)
             return game
         return self.last_game_pk
 
@@ -442,76 +612,84 @@ class Team(metaclass=IterTeam):
                 return "home"
         return self.last_game_pk
 
+    def next_game_probable_pitchers(self):
+        return self.next_game["gameData"]["probablePitchers"]
+
+    def probable_pitcher_id_string(self, home_or_away):
+        return "ID" + str(self.next_game_probable_pitchers()[self.opp_ha]["id"])
+    
+    def probable_pitcher_info(self, home_or_away):
+        sp_id = self.probable_pitcher_id_string(home_or_away)
+        return self.next_game["gameData"]["players"][sp_id]
+
+    @staticmethod
+    def check_confirmed_sp(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_sp"]
+
     @cached_property
     def opp_sp(self):
         if self.opp_instance.custom_sp:
-            return statsapi.get("people", {"personIds": self.opp_instance.custom_sp})[
-                "people"
-            ][0]
+            return Team.get_player_api(self.opp_instance_custom_sp)
         if self.next_game_pk:
             daily_info = Team.daily_info()
-            if self.opp_name not in daily_info["confirmed_sp"] and not self.ppd:
+            opp_sp_confirmed = Team.check_confirmed_sp(daily_info, self.opp_name)
+            if not opp_sp_confirmed and not self.ppd:
                 self.del_next_game()
             try:
-                sp_id = "ID" + str(
-                    self.next_game["gameData"]["probablePitchers"][self.opp_ha]["id"]
-                )
-                sp_info = self.next_game["gameData"]["players"][sp_id]
-                daily_info = Team.daily_info()
-                if self.opp_name not in daily_info["confirmed_sp"]:
-                    daily_info["confirmed_sp"].append(self.opp_name)
-
-                    Team.dump_json_data(settings.daily_info_file, daily_info)
-
+                #KeyError would be raised on opp_sp_info, if no listed pitcher
+                sp_info = self.probable_pitcher_info(self.opp_ha)
+                if not opp_sp_confirmed:
+                    Team.update_daily_info(daily_info, "confirmed_sp", self.opp_name)
                 self.opp_instance.cache_next_game()
                 return sp_info
             except KeyError:
                 starters = self.opp_instance.rested_sp()
                 try:
-                    projected_sp = starters.loc[starters["fd_ps_s"].idxmax()]
+                    column = settings.PROJECTED_SP_COLUMN
+                    projected_sp = starters.loc[starters[column].idxmax()]
                 except (KeyError, ValueError):
                     bullpen = self.opp_instance.rested_bullpen
                     try:
-                        projected_sp = bullpen.loc[bullpen["batters_faced_sp"].idxmax()]
+                        col = "batters_faced_sp"
+                        projected_sp = bullpen.loc[bullpen[col].idxmax()]
                     except (KeyError, ValueError):
+                        #pitches per appearance
+                        col = "ppa"
                         projected_sp = bullpen.loc[bullpen["ppa"].idxmax()]
                 i_d = int(projected_sp["mlb_id"].item())
-                return statsapi.get("people", {"personIds": i_d})["people"][0]
+                return Team.get_player_api(i_d)
         return self.next_game_pk
 
     def projected_sp(self):
         if self.custom_sp:
-            return statsapi.get("people", {"personIds": self.custom_sp})["people"][0]
+            return Team.get_player_api(self.custom_sp)
         if self.next_game_pk:
             daily_info = Team.daily_info()
-            if self.name not in daily_info["confirmed_sp"] and not self.ppd:
+            sp_confirmed = Team.check_confirmed_sp(daily_info, self.name)
+            if not sp_confirmed and not self.ppd:
                 self.del_next_game()
             try:
-                sp_id = "ID" + str(
-                    self.next_game["gameData"]["probablePitchers"][self.ha]["id"]
-                )
-                sp_info = self.next_game["gameData"]["players"][sp_id]
-                if self.name not in daily_info["confirmed_sp"]:
-                    daily_info["confirmed_sp"].append(self.name)
-
-                    Team.dump_json_data(settings.daily_info_file, daily_info)
-
+                #KeyError would be here
+                sp_info = self.probable_pitcher_info(self.ha)
+                if sp_confirmed:
+                    Team.update_daily_info(daily_info, "confirmed_sp", self.name)
                 self.cache_next_game()
                 return sp_info
             except KeyError:
-                daily_info["auto_projected_sp"].append(self.name)
-                Team.dump_json_data(settings.daily_info_file, daily_info)
                 starters = self.rested_sp()
                 try:
-                    projected_sp = starters.loc[starters["fd_ps_s"].idxmax()]
+                    col = settings.PROJECTED_SP_COLUMN
+                    projected_sp = starters.loc[starters[col].idxmax()]
                 except (KeyError, ValueError):
                     bullpen = self.rested_bullpen
                     try:
-                        projected_sp = bullpen.loc[bullpen["batters_faced_sp"].idxmax()]
+                        col = "batters_faced_sp"
+                        projected_sp = bullpen.loc[bullpen[col].idxmax()]
                     except (KeyError, ValueError):
-                        projected_sp = bullpen.loc[bullpen["ppa"].idxmax()]
+                        col = "ppa"
+                        projected_sp = bullpen.loc[bullpen[col].idxmax()]
                 i_d = int(projected_sp["mlb_id"].item())
-                return statsapi.get("people", {"personIds": i_d})["people"][0]
+                return Team.get_player_api(i_d)
         return self.next_game_pk
 
     @cached_property
@@ -554,65 +732,6 @@ class Team(metaclass=IterTeam):
             return name
         return self.next_game_pk
 
-    @staticmethod
-    def lineups():
-
-        try:
-            with open(settings.team_lineups_file) as file:
-                team_lineups = json.load(file)
-                file.close()
-            return team_lineups
-        except (FileNotFoundError, JSONDecodeError):
-            team_lineups = {}
-            for team in team_info.keys():
-
-                team_lineups[team] = {'L': [], 'R': []}
-            Team.dump_json_data(settings.team_lineups_file, team_lineups)
-
-            return team_lineups
-
-    @staticmethod
-    def daily_info():
-        file = json_path(name=f"daily_info_{tf.today}", directory=settings.STORAGE_DIR)
-        try:
-            with open(file) as f:
-                daily_info = json.load(f)
-        except (FileNotFoundError, JSONDecodeError):
-
-            daily_info = {
-                "confirmed_lu": [],
-                "confirmed_sp": [],
-                "rain": [],
-                "auto_projected_sp": []
-                }
-
-            with open(file, "w+") as f:
-                json.dump(daily_info, f)
-        return daily_info
-
-    @staticmethod
-
-    def dump_json_data(file, json_data):
-        with open(file, "w+") as f:
-            json.dump(json_data, f)
-        return "Dumped daily info."
-    @staticmethod
-    def drop(df,iter_filt):
-        df = df.loc[~df.duplicated(subset=['mlb_id'])]
-        df = df[df['mlb_id'].isin(iter_filt)]
-
-        return df
-
-    @staticmethod
-    def default_sp():
-        df = a_dfs["pitchers"]["SP"]["RAW"]["raw"]
-        empty = df[df["mlb_id"] == 0]
-        defaults = a_dfs["pitchers"]["SP"]["RAW"]["raw"].median()
-        empty = empty.append(defaults, ignore_index=True)
-        empty["name"] = "Unknown"
-        empty["pitch_hand"] = "R"
-        return empty
-
     @cached_property
     def lineup(self):
         if self.custom_lineup:
@@ -632,7 +751,6 @@ class Team(metaclass=IterTeam):
                 self.update_lineup(lineup, self.opp_sp_hand)
                 if self.name not in daily_info["confirmed_lu"]:
                     daily_info["confirmed_lu"].append(self.name)
-
                     Team.dump_json_data(settings.daily_info_file, daily_info)
 
                 self.cache_next_game()
@@ -646,6 +764,7 @@ class Team(metaclass=IterTeam):
         print(f"Getting projected lineup for {self.name}")
         team_lineups = Team.lineups()
         try:
+            #i do this because 
             if len(team_lineups[self.name][self.opp_sp_hand]) == 9:
                 return team_lineups[self.name][self.opp_sp_hand]
             else:
@@ -677,8 +796,7 @@ class Team(metaclass=IterTeam):
         return lineup
 
     def get_replacement(self, position, position_type, excluded):
-        roster = pd.DataFrame(self.full_roster)
-        roster = roster.join(h_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop")
+        roster = Team.join_player_stats(pd.DataFrame(self.full_roster))
         h_key = "fd_wps_pa_" + self.o_split
         if str(position) in mac.players.p:
             if not self.is_dh:
@@ -698,7 +816,7 @@ class Team(metaclass=IterTeam):
                 try:
                     return dh.loc[dh[h_key].idxmax()]
                 except (KeyError, ValueError):
-                    hitters = self.batters(active=True)
+                    hitters = self.batters(active_players_only=True)
                     hitters = hitters[
                         (~hitters["mlb_id"].isin(excluded))
                         & (hitters["pa_" + self.o_split] > 100)
@@ -706,41 +824,24 @@ class Team(metaclass=IterTeam):
                     try:
                         return hitters.loc[hitters[h_key].idxmax()]
                     except (KeyError, ValueError):
-                        hitters = self.batters(active=True)
+                        hitters = self.batters(active_players_only=True)
                         return hitters.loc[hitters[h_key].idxmax()]
         else:
-            hitters = self.batters(active=True)
+            hitters = self.batters(active_players_only=True)
             hitters = hitters[~hitters["mlb_id"].isin(excluded)]
             hitters = hitters[hitters["position"].astype(str) == position]
             try:
                 return hitters.loc[hitters[h_key].idxmax()]
             except (KeyError, ValueError):
-                hitters = self.batters(active=True)
+                hitters = self.batters(active_players_only=True)
                 hitters = hitters[~hitters["mlb_id"].isin(excluded)]
                 hitters = hitters[hitters["position_type"].astype(str) == position_type]
                 try:
                     return hitters.loc[hitters[h_key].idxmax()]
                 except (KeyError, ValueError):
-                    hitters = self.batters(active=True)
+                    hitters = self.batters(active_players_only=True)
                     hitters = hitters[~hitters["mlb_id"].isin(excluded)]
                     return hitters.loc[hitters[h_key].idxmax()]
-
-    @staticmethod
-    def get_split_players(df, hand, return_percentage=False, pitchers=False):
-        if pitchers:
-            split = "pitch_hand"
-        else:
-            split = "bat_side"
-        filt = df[split] == hand.upper()
-        if return_percentage:
-            split_length = len(df[filt].index)
-            return split_length / settings.LU_LENGTH
-
-        if not return_percentage or not pitchers:
-            return filt
-        else:
-            split_length = len(df[filt].index)
-            return split_length / settings.LU_LENGTH
 
     def lineup_df(self):
         file = pickle_path(
@@ -748,57 +849,35 @@ class Team(metaclass=IterTeam):
         )
         path = settings.LINEUP_DIR.joinpath(file)
         daily_info = Team.daily_info()
-        if self.name not in daily_info["confirmed_lu"] and not self.ppd:
+        def calculate_team_lu_points(self, lineup_df):
+            self.raw_points = lineup_df["exp_ps_raw"].sum()
+            self.venue_points = lineup_df["venue_points"].sum()
+            self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
+            self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
+            self.points = (
+                self.venue_points + self.temp_points + self.ump_points + self.raw_points
+            )
+            self.sp_mu = lineup_df["sp_mu"].sum()
+            self.lu_talent_sp = lineup_df["sp_split"].sum() - lineup_df["sp_split"].std(ddof=0)
+            return lineup_df
+        if not self.ppd and (self.name not in daily_info["confirmed_lu"] or self.name in settings.reset_specific_lineups or settings.reset_all_lineups):
             self.del_props()
-        if not path.exists() or self.name not in daily_info["confirmed_lu"]:
+        if not path.exists() or self.name not in daily_info["confirmed_lu"] or self.name in settings.reset_specific_lineups or settings.reset_all_lineups:
             lineup_ids = self.lineup
             lineup = pd.DataFrame(lineup_ids, columns=["mlb_id"])
             roster = pd.DataFrame(self.full_roster)
             merged = pd.merge(lineup, roster, on="mlb_id")
-
-            h_df = merged.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
-            roster = roster.join(h_splits.set_index('mlb_id'), on='mlb_id', rsuffix='_drop')
-            # if settings.use_fangraphs:
-            #     def drop(df):
-            #         df = df.loc[~df.duplicated(subset=['mlb_id'])]
-            #         df = df[df['mlb_id'].isin(lineup_ids)]
-            #         return df
-            #     from dfs_tools_mlb.compile.stats_fangraphs import Stats
-            #     fg_stats = Stats.current_stats()
-            #     h_df = sm_merge(h_df, fg_stats, columns=['name', 'team'], ratios=[.63, 1], prefix='m_', reset_index=False, post_drop=True, suffixes=('', '_fg'))
-            #     h_df = drop(h_df)
-            
-
+            h_df = Team.join_player_stats(merged)
+            roster = Team.join_player_stats(roster)
             if not self.custom_lineup:
-                h_df = h_df[
-                    ~(
-                        (h_df["position"].astype(str).isin(mac.players.p))
-                        & (h_df["mlb_id"] != 660271)
-                    )
-                ]
-                if not self.is_dh and len(h_df.index) == 9:
-                    h_key = "fd_wps_pa_" + self.o_split
-                    i_d = h_df.loc[h_df[h_key].idxmin(), "mlb_id"].item()
-                    h_df.drop(h_df[h_key].idxmin(), inplace=True)
-                    new_row = self.get_replacement("S", "Pitcher", lineup_ids)
-                    h_df = h_df.append(new_row, ignore_index=True)
-                    lineup_ids.remove(i_d)
-                    lineup_ids.append(int(new_row["mlb_id"]))
                 if len(h_df.index) < 9:
                     for i_d in lineup_ids:
                         if i_d not in h_df["mlb_id"].values:
                             new_row = roster[roster["mlb_id"] == i_d]
-                            new_row = new_row[
-                                ~new_row["position"].astype(str).isin(mac.players.p)
-                            ]
                             if len(new_row.index) == 0:
-                                player = statsapi.get("people", {"personIds": i_d})
-                                position = player["people"][0]["primaryPosition"][
-                                    "code"
-                                ]
-                                position_type = player["people"][0]["primaryPosition"][
-                                    "type"
-                                ]
+                                player = Team.get_player_api(i_d)
+                                position = player["primaryPosition"]["code"]
+                                position_type = player["primaryPosition"]["type"]
                                 new_row = self.get_replacement(
                                     position, position_type, lineup_ids
                                 )
@@ -818,154 +897,60 @@ class Team(metaclass=IterTeam):
             else:
                 h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "R"
 
-            def adjust_non_qualified_h(df1, stat1, stat2):
-
-                p_filt = h_df["position"].isin(mac.players.p)
-                h_filt = ~h_df["position"].isin(mac.players.p)
-                l_filt = Team.get_split_players(h_df, "L")
-                r_filt = Team.get_split_players(h_df, "R")
-                samp = settings.MIN_PA_HITTER
-                samp_split = settings.MIN_PA_HITTER_SPLIT
-                df1.loc[
-                    (((df1[stat1] < samp) | (df1[stat2].isna())) & p_filt), stat2
-                ] = a_dfs["hitting"]["RAW"]["pitchers"][stat2].median()
-                df1.loc[
-                    (((df1[stat1] < samp) | (df1[stat2].isna())) & h_filt), stat2
-                ] = a_dfs["hitting"]["RAW"]["hitters"][stat2].median()
-                df1.loc[
-                    ((df1[stat1 + "_vl"] < samp_split) | (df1[stat2 + "_vl"].isna()))
-                    & h_filt
-                    & l_filt,
-                    stat2 + "_vl",
-                ] = a_dfs["hitting"]["L"]["vs_l"][stat2 + "_vl"].median()
-                df1.loc[
-                    ((df1[stat1 + "_vl"] < samp_split) | (df1[stat2 + "_vl"].isna()))
-                    & h_filt
-                    & r_filt,
-                    stat2 + "_vl",
-                ] = a_dfs["hitting"]["R"]["vs_l"][stat2 + "_vl"].median()
-                df1.loc[
-                    ((df1[stat1 + "_vl"] < samp_split) | (df1[stat2 + "_vl"].isna()))
-                    & p_filt,
-                    stat2 + "_vl",
-                ] = a_dfs["hitting"]["RAW"]["pitchers"][stat2 + "_vl"].median()
-                df1.loc[
-                    ((df1[stat1 + "_vr"] < samp_split) | (df1[stat2 + "_vr"].isna()))
-                    & h_filt
-                    & l_filt,
-                    stat2 + "_vr",
-                ] = a_dfs["hitting"]["L"]["vs_r"][stat2 + "_vr"].median()
-                df1.loc[
-                    ((df1[stat1 + "_vr"] < samp_split) | (df1[stat2 + "_vr"].isna()))
-                    & h_filt
-                    & r_filt,
-                    stat2 + "_vr",
-                ] = a_dfs["hitting"]["R"]["vs_r"][stat2 + "_vr"].median()
-                df1.loc[
-                    ((df1[stat1 + "_vr"] < samp_split) | (df1[stat2 + "_vr"].isna()))
-                    & p_filt,
-                    stat2 + "_vr",
-                ] = a_dfs["hitting"]["RAW"]["pitchers"][stat2 + "_vr"].median()
-                return df1
-
-            STATS_H = settings.STATS_TO_ADJUST_H
-
-            for stat in STATS_H:
-                h_df = adjust_non_qualified_h(h_df, "pa", stat)
+            h_df = Team.adjust_non_qualified_h(h_df)
 
             try:
                 p_info = self.opp_sp
                 player = api_pitcher_info_dict(p_info)
                 player["team"] = self.opp_name
-                p_df = pd.DataFrame([player]).join(
-                    p_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop"
-                )
+                Team.join_player_stats(pd.DataFrame([player]), hitters=False)
             except TypeError:
                 p_df = Team.default_sp()
 
-            lefties = Team.get_split_players(h_df, "L")
-            righties = Team.get_split_players(h_df, "R")
-            l_weight = Team.get_split_players(h_df, "L", return_percentage=True)
-            r_weight = Team.get_split_players(h_df, "R", return_percentage=True)
-            # if 'L' in p_df['pitch_hand'].item():
-
-            #     p_df.loc[(p_df['ppb_vl'] < settings.MIN_BF_PITCHER_SPLIT) | (p_df['ppb_vl'].isna()), 'ppb_vl']\
-            #         = a_dfs['pitchers']['SP']['L']['vs_l']['ppb_vl'].median()
-            #     p_df.loc[(p_df['ppb_vr'] < settings.MIN_BF_PITCHER_SPLIT) | (p_df['ppb_vr'].isna()), 'ppb_vr']\
-            #         = a_dfs['pitchers']['SP']['L']['vs_r']['ppb_vr'].median()
-
-            # else:
-            #     p_df.loc[(p_df['ppb_vl'] < settings.MIN_BF_PITCHER_SPLIT) | (p_df['ppb_vl'].isna()), 'ppb_vl']\
-            #         = a_dfs['pitchers']['SP']['R']['vs_l']['ppb_vl'].median()
-            #     p_df.loc[(p_df['ppb_vr'] < settings.MIN_BF_PITCHER_SPLIT) | (p_df['ppb_vr'].isna()), 'ppb_vr']\
-            #         = a_dfs['pitchers']['SP']['R']['vs_r']['ppb_vr'].median()
-
-            def adjust_non_qualified_sp(df1, stat1, stat2, hand=None):
-
-                if hand:
-                    if "L" in hand.upper():
-
-                        df1.loc[
-                            (df1[stat1 + "_vl"] < settings.MIN_BF_PITCHER_SPLIT)
-                            | (df1[stat2 + "_vl"].isna()),
-                            stat2 + "_vl",
-                        ] = a_dfs["pitchers"]["SP"]["L"]["vs_l"][stat2 + "_vl"].median()
-                        df1.loc[
-                            (df1[stat1 + "_vr"] < settings.MIN_BF_PITCHER_SPLIT)
-                            | (df1[stat2 + "_vr"].isna()),
-                            stat2 + "_vr",
-                        ] = a_dfs["pitchers"]["SP"]["L"]["vs_r"][stat2 + "_vr"].median()
-
-                    else:
-
-                        df1.loc[
-                            (df1[stat1 + "_vl"] < settings.MIN_BF_PITCHER_SPLIT)
-                            | (df1[stat2 + "_vl"].isna()),
-                            stat2 + "_vl",
-                        ] = a_dfs["pitchers"]["SP"]["R"]["vs_l"][stat2 + "_vl"].median()
-                        df1.loc[
-                            (df1[stat1 + "_vr"] < settings.MIN_BF_PITCHER_SPLIT)
-                            | (df1[stat2 + "_vr"].isna()),
-                            stat2 + "_vr",
-                        ] = a_dfs["pitchers"]["SP"]["R"]["vs_r"][stat2 + "_vr"].median()
-
-                df1.loc[
-                    (df1[stat1] < settings.MIN_BF_PITCHER) | (df1[stat2].isna()), stat2
-                ] = a_dfs["pitchers"]["SP"]["RAW"]["raw"][stat2].median()
-                return df1
-
-            for stat in settings.STATS_TO_ADJUST_P:
-                p_df = adjust_non_qualified_sp(
-                    p_df, "batters_faced", stat, hand=p_df["pitch_hand"].item()
-                )
-                # p_df = adjust_non_qualified_sp(p_df,
-                #                        'batters_faced', stat,
-                #                       )
-
+            lefties = Team.get_split_filter(h_df, "L")
+            righties = Team.get_split_filter(h_df, "R")
+            l_weight = Team.get_split_filter(h_df, "L", return_percentage=True)
+            r_weight = Team.get_split_filter(h_df, "R", return_percentage=True)
+            p_df = Team.adjust_non_qualified_p(p_df)
             p_ppb = (
                 (l_weight * p_df["ppb_vl"].max()) + (r_weight * p_df["ppb_vr"].max())
             ) * settings.LU_LENGTH
 
-            # custom_pps here
-            p_df["pitches_start"].fillna(
-                a_dfs["pitchers"]["SP"]["RAW"]["raw"]["pitches_start"].median(),
-                inplace=True,
-            )
-            if self.opp_instance.custom_pps:
+            if not self.opp_instance.custom_pps:
+                p_df["pitches_start"].fillna(
+                    a_dfs["P"]["SP"]["RAW"]["raw"]["pitches_start"].median(),
+                    inplace=True,
+                )
+            else:
                 p_df["pitches_start"] = self.opp_instance.custom_pps
 
             key = "pitches_pa_" + self.o_split
-            p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() + p_ppb) / 2)
+            h_df.loc[lefties, 'pitches_pa_sp'] = ((h_df[key] * settings.H_PIT_PER_BAT_WEIGHT) + (p_df['ppb_vl'].max() * settings.P_PIT_PER_BAT_WEIGHT))
+            pitches_ab_array = h_df[key].to_numpy()
+            pitches = p_df['pitches_start'].item()
+            idx = 0
+            total_batters_faced = 0
+            while pitches > 0:
+                pitches -= pitches_ab_array[idx]
+                total_batters_faced += 1
+                idx += 1
+                if idx == 9:
+                    idx = 0
+            p_df["exp_x_lu"] = total_batters_faced / settings.LU_LENGTH
+            
+            # p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() * settings.H_PIT_PER_BAT_WEIGHT) + (p_ppb * settings.P_PIT_PER_BAT_WEIGHT))
             h_df["sp_exp_x_lu"] = p_df["exp_x_lu"].max()
+            
             print(
                 f"{p_df['name'].max()} expected to go through {self.name} LU {p_df['exp_x_lu'].max()} times. P:{p_ppb} LU: {h_df[key].sum()}"
             )
-            p_df["exp_bf"] = round((p_df["exp_x_lu"] * settings.LU_LENGTH))
-
+            p_df["exp_bf"] = total_batters_faced
+            # p_df["exp_bf"] = round((p_df["exp_x_lu"] * settings.LU_LENGTH))
             sp_rollover = floor((p_df["exp_x_lu"] % 1) * settings.LU_LENGTH)
             h_df.loc[h_df["order"] <= sp_rollover, "exp_pa_sp"] = ceil(p_df["exp_x_lu"])
             h_df.loc[h_df["order"] > sp_rollover, "exp_pa_sp"] = floor(p_df["exp_x_lu"])
-
+            h_df['exp_pitches'] = h_df['exp_pa_sp'] * h_df[key]
+            # average_p_ab_top_lu = h_df.loc[(h_df['exp_pa_sp'] == h_df['exp_pa_sp'].max()), key].mean()
             key = "fd_wps_pa_" + self.o_split
             h_df.loc[lefties, "exp_ps_sp_pa"] = (
                 p_df["fd_wpa_b_vl"].max() * settings.P_PTS_WEIGHT
@@ -985,98 +970,47 @@ class Team(metaclass=IterTeam):
             h_df.loc[righties, "sp_mu"] = p_df["fd_wpa_b_vr"].max()
             h_df["sp_split"] = h_df[key]
             h_df["exp_ps_sp_raw"] = h_df[key] * h_df["exp_pa_sp"]
-            self.lu_talent_sp = h_df["sp_split"].sum() - h_df["sp_split"].std(ddof=0)
-            self.sp_mu = h_df["sp_mu"].sum()
             # points conceded
             key = "fd_wpa_pa_" + self.o_split
             k_key = "k_pa_" + self.o_split
-            # h_df.loc[lefties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vl'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
-            # h_df.loc[righties, 'exp_pc_sp'] = (((p_df['fd_wps_b_vr'].max() * 1) + (h_df[key] * 1)) / 2) * h_df['exp_pa_sp']
-            h_df.loc[lefties, "exp_pc_sp"] = (
+           
+            h_df.loc[lefties, "exp_pc_sp"] = ((
                 p_df["fd_wps_b_vl"].max() * settings.P_PTS_WEIGHT
-            ) + (h_df[key] * settings.H_PTS_WEIGHT)
-            h_df.loc[righties, "exp_pc_sp"] = (
+            ) + (h_df[key] * settings.H_PTS_WEIGHT) * h_df["exp_pa_sp"])
+            h_df.loc[righties, "exp_pc_sp"] = ((
                 p_df["fd_wps_b_vr"].max() * settings.P_PTS_WEIGHT
-            ) + (h_df[key] * settings.H_PTS_WEIGHT)
-            # h_df['exp_pc_sp_raw'] = h_df[key] * h_df['exp_pa_sp']
-            h_df["exp_pc_sp_raw"] = h_df[key]
-            h_df["raw_exp_pc_sp"] = h_df[key]
-            h_df.loc[lefties, "exp_k"] = (
+            ) + (h_df[key] * settings.H_PTS_WEIGHT) * h_df["exp_pa_sp"])
+            
+            h_df["exp_pc_sp_raw"] = (h_df[key])
+            h_df["raw_exp_pc_sp"] = (h_df[key] * h_df["exp_pa_sp"])
+            h_df.loc[lefties, "exp_k"] = ((
                 p_df["k_b_vl"].max() * settings.P_K_WEIGHT
-            ) + (h_df[k_key] * settings.H_K_WEIGHT)
-            h_df.loc[righties, "exp_k"] = (
+            ) + (h_df[k_key] * settings.H_K_WEIGHT) * h_df["exp_pa_sp"])
+            h_df.loc[righties, "exp_k"] = ((
                 p_df["k_b_vr"].max() * settings.P_K_WEIGHT
-            ) + (h_df[k_key] * settings.H_K_WEIGHT)
+            ) + (h_df[k_key] * settings.H_K_WEIGHT) * h_df["exp_pa_sp"])
             # h_df.loc[lefties, 'exp_k'] = (((p_df['k_b_vl'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
             # h_df.loc[righties, 'exp_k'] = (((p_df['k_b_vr'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
-            h_df["exp_k_sp_raw"] = h_df[k_key]
+            h_df["exp_k_sp_raw"] = (h_df[k_key] * h_df["exp_pa_sp"])
             exp_pa_r_sp = h_df.loc[righties, "exp_pa_sp"].sum()
             exp_pa_l_sp = h_df.loc[lefties, "exp_pa_sp"].sum()
-            p_df["exp_ra"] = floor(
-                (exp_pa_r_sp * p_df["ra-_b_vr"].max())
-                + (exp_pa_l_sp * p_df["ra-_b_vl"].max())
-            )
+            key = "rb-_pa_" + self.o_split
+            h_df['exp_hits_sp'] = (h_df[key] * h_df["exp_pa_sp"])
+            exp_hits_lu = floor(h_df['exp_hits_sp'].sum())
+            p_df["exp_ra"] = (floor(
+                (exp_pa_r_sp * p_df["ra-_b_vr"].max()) * settings.P_HITS_ALLOWED_WEIGHT
+                + (exp_pa_l_sp * p_df["ra-_b_vl"].max()))
+             + (exp_hits_lu * settings.H_HITS_ALLOWED_WEIGHT))
             p_df["exp_inn"] = (p_df["exp_bf"].max() - p_df["exp_ra"].max()) / 3
             h_df["sp_exp_inn"] = p_df["exp_inn"].max()
             if self.is_home:
                 exp_bp_inn = settings.BP_INNINGS_HOME - p_df["exp_inn"].max()
             else:
                 exp_bp_inn = settings.BP_INNINGS_ROAD - p_df["exp_inn"].max()
-            bp = self.proj_opp_bp
+            
 
-            def adjust_non_qualified_rp(df, base="batters_faced"):
-                l_filt = Team.get_split_players(
-                    df, "L", return_percentage=False, pitchers=True
-                )
-                r_filt = Team.get_split_players(
-                    df, "R", return_percentage=False, pitchers=True
-                )
-                for stat in settings.STATS_TO_ADJUST_RP:
-                    df.loc[
-                        (
-                            (df[base + "_vr"] < settings.MIN_BF_BP_SPLIT)
-                            | (df[stat + "_vr"].isna())
-                        )
-                        & r_filt,
-                        stat + "_vr",
-                    ] = a_dfs["pitchers"]["BP"]["R"]["vs_r"][stat + "_vr"].median()
-                    df.loc[
-                        (
-                            (df[base + "_vl"] < settings.MIN_BF_BP_SPLIT)
-                            | (df[stat + "_vl"].isna())
-                        )
-                        & l_filt,
-                        stat + "_vl",
-                    ] = a_dfs["pitchers"]["BP"]["L"]["vs_l"][stat + "_vl"].median()
-                    df.loc[
-                        (
-                            (df[base + "_vr"] < settings.MIN_BF_BP_SPLIT)
-                            | (df[stat + "_vr"].isna())
-                        )
-                        & l_filt,
-                        stat + "_vr",
-                    ] = a_dfs["pitchers"]["BP"]["L"]["vs_r"][stat + "_vr"].median()
-                    df.loc[
-                        (
-                            (df[base + "_vl"] < settings.MIN_BF_BP_SPLIT)
-                            | (df[stat + "_vl"].isna())
-                        )
-                        & r_filt,
-                        stat + "_vl",
-                    ] = a_dfs["pitchers"]["BP"]["R"]["vs_l"][stat + "_vl"].median()
-                    df.loc[
-                        (bp[base + "_rp"] < settings.MIN_BF_BP_SPLIT)
-                        | (df[stat + "_rp"].isna()),
-                        stat + "_rp",
-                    ] = a_dfs["pitchers"]["BP"]["RAW"]["raw"][stat + "_rp"].median()
-                    df.loc[
-                        (bp[base + "_rp"] < settings.MIN_BF_BP_SPLIT)
-                        | (df[stat + "_rp"].isna()),
-                        stat + "_rp",
-                    ] = a_dfs["pitchers"]["BP"]["RAW"]["raw"][stat + "_rp"].median()
-                return df
-
-            bp = adjust_non_qualified_rp(bp)
+            
+            bp = Team.adjust_non_qualified_p(self.proj_opp_bp, bullpen = True)
             try:
                 exp_bf_bp = round(
                     (exp_bp_inn * 3) + ((exp_bp_inn * 3) * bp["ra-_b_rp"].mean())
@@ -1087,7 +1021,7 @@ class Team(metaclass=IterTeam):
                     (exp_bp_inn * 3)
                     + (
                         (exp_bp_inn * 3)
-                        * a_dfs["pitchers"]["BP"]["RAW"]["raw"]["ra-_b_rp"].median()
+                        * a_dfs["P"]["BP"]["RAW"]["raw"]["ra-_b_rp"].median()
                     )
                 )
 
@@ -1103,39 +1037,41 @@ class Team(metaclass=IterTeam):
                 order += 1
                 exp_bf_bp -= 1
             h_df.loc[lefties, "exp_ps_bp"] = h_df["exp_pa_bp"] * (
-                ((bp["fd_wpa_b_vl"].median() * 1) + (h_df["fd_wps_pa"] * 1)) / 2
+                (bp["fd_wpa_b_vl"].mean() * settings.P_PTS_WEIGHT) + (h_df["fd_wps_pa"] * settings.H_PTS_WEIGHT)
             )
             h_df.loc[righties, "exp_ps_bp"] = h_df["exp_pa_bp"] * (
-                ((bp["fd_wpa_b_vr"].median() * 1) + (h_df["fd_wps_pa"] * 1)) / 2
+                (bp["fd_wpa_b_vr"].mean() * settings.P_PTS_WEIGHT) + (h_df["fd_wps_pa"] * settings.H_PTS_WEIGHT)
             )
 
             # h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
             h_df["exp_ps_raw"] = h_df["exp_ps_sp"] + h_df["exp_ps_bp"]
-            self.raw_points = h_df["exp_ps_raw"].sum()
-            self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
-            self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
-            # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
             h_df.loc[lefties, "venue_points"] = (
                 h_df["exp_ps_raw"] * self.next_venue_boost_lhb
             ) - h_df["exp_ps_raw"]
             h_df.loc[righties, "venue_points"] = (
                 h_df["exp_ps_raw"] * self.next_venue_boost_rhb
             ) - h_df["exp_ps_raw"]
-            self.venue_points = h_df["venue_points"].sum()
-            self.points = (
-                self.venue_points + self.temp_points + self.ump_points + self.raw_points
-            )
+            h_df = calculate_team_lu_points(self, h_df)
+            # self.raw_points = h_df["exp_ps_raw"].sum()
+            # self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
+            # self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
+            # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
+            
+            # self.venue_points = h_df["venue_points"].sum()
+            # self.points = (
+            #     self.venue_points + self.temp_points + self.ump_points + self.raw_points
+            # )
             # self.venue_points = (self.raw_points * self.next_venue_boost) - self.raw_points
 
             h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
             h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
             h_df['points'] = h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points'] + h_df['exp_ps_raw']
-            Team.pickle_dump(h_df, file)
+            pickle_dump(h_df, file)
 
         else:
             h_df = pd.read_pickle(path)
-            lefties = Team.get_split_players(h_df, "L")
-            righties = Team.get_split_players(h_df, "R")
+            lefties = Team.get_split_filter(h_df, "L")
+            righties = Team.get_split_filter(h_df, "R")
             h_df.loc[lefties, "venue_points"] = (
                 h_df["exp_ps_raw"] * self.next_venue_boost_lhb
             ) - h_df["exp_ps_raw"]
@@ -1155,17 +1091,21 @@ class Team(metaclass=IterTeam):
                 + h_df["exp_ps_raw"]
             )
             # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
-            self.raw_points = h_df["exp_ps_raw"].sum()
-            self.venue_points = h_df["venue_points"].sum()
-            self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
-            self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
-            self.points = (
-                self.venue_points + self.temp_points + self.ump_points + self.raw_points
-            )
-            self.sp_mu = h_df["sp_mu"].sum()
-            self.lu_talent_sp = h_df["sp_split"].sum() - h_df["sp_split"].std(ddof=0)
+            # self.raw_points = h_df["exp_ps_raw"].sum()
+            # self.venue_points = h_df["venue_points"].sum()
+            # self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
+            # self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
+            # self.points = (
+            #     self.venue_points + self.temp_points + self.ump_points + self.raw_points
+            # )
+            # self.sp_mu = h_df["sp_mu"].sum()
+            # self.lu_talent_sp = h_df["sp_split"].sum() - h_df["sp_split"].std(ddof=0)
             # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
+            h_df = calculate_team_lu_points(self, h_df)
         return h_df
+    
+        
+        
 
     def sp_df(self):
         daily_info = Team.daily_info()
@@ -1173,7 +1113,7 @@ class Team(metaclass=IterTeam):
         slug = projected_sp["nameSlug"]
         file = pickle_path(name=f"{slug}_{tf.today}", directory=settings.SP_DIR)
         path = settings.SP_DIR.joinpath(file)
-        if path.exists():
+        if path.exists() and self.name not in settings.reset_specific_pitchers and not settings.reset_all_pitchers:
             p_df = pd.read_pickle(path)
             p_df["venue_points"] = (
                 p_df["exp_ps_raw"] * (-self.next_venue_boost % 2)
@@ -1196,27 +1136,26 @@ class Team(metaclass=IterTeam):
             p_info = projected_sp
             player = api_pitcher_info_dict(p_info)
             player["team"] = self.name
-            p_df = pd.DataFrame([player]).join(
-                p_splits.set_index("mlb_id"), on="mlb_id", rsuffix="_drop"
-            )
+            p_df = Team.join_player_stats(pd.DataFrame([player]), hitters=False)
+            
         except TypeError:
             print("Getting default SP stats.")
             p_df = Team.default_sp()
         h_df = self.opp_instance.lineup_df()
         p_df["opponent"] = self.opp_instance.name
         p_df["exp_inn"] = h_df["sp_exp_inn"].max()
-        p_df["k_pred"] = (h_df["exp_k"].sum() - h_df["exp_k"].std(ddof=0)) * h_df[
-            "sp_exp_x_lu"
-        ].max()
+        p_df["k_pred"] = (h_df["exp_k"].sum() - h_df["exp_k"].std(ddof=0))
         p_df["k_pred_raw"] = h_df["exp_k_sp_raw"].sum() - h_df["exp_k_sp_raw"].std(
             ddof=0
         )
         p_df["exp_ps_raw"] = (
             h_df["exp_pc_sp"].sum() - h_df["exp_pc_sp"].std(ddof=0)
-        ) * h_df["sp_exp_x_lu"].max()
+        )
         p_df["mu"] = h_df["exp_pc_sp"].sum() - h_df["exp_pc_sp"].std(ddof=0)
         p_df["raw_mu"] = h_df["raw_exp_pc_sp"].sum() - h_df["raw_exp_pc_sp"].std(ddof=0)
-        # p_df['exp_ps_raw'] = h_df['exp_pc_sp'].sum() + h_df['exp_pc_sp_raw'].sum()
+        
+        
+        
 
         p_df['venue_points'] = (p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)) - p_df['exp_ps_raw']
         p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
@@ -1228,7 +1167,7 @@ class Team(metaclass=IterTeam):
         p_df['env_points'] = self.env_avg
         
         if self.name in daily_info['confirmed_sp']:
-            Team.pickle_dump(p_df, file)
+            pickle_dump(p_df, file)
 
         return p_df
 
@@ -1241,7 +1180,7 @@ class Team(metaclass=IterTeam):
             )["games"][0]
             game_pk = game["gamePk"]
             print(game_pk)
-            game_box = statsapi.get("game", {"gamePk": game_pk})
+            game_box = Team.get_game_api(game_pk)
         except (StopIteration, TypeError):
             return f"The {self.name.capitalize()} are not currently playing."
         all_plays = game_box["liveData"]["plays"]["allPlays"]
@@ -1322,27 +1261,17 @@ class Team(metaclass=IterTeam):
         return self.next_game_pk
 
     @cached_property
-    def projected_ump(self):
-        def get_official(game, ump_type):
-            try:
-                officials = game["liveData"]["boxscore"]["officials"]
-                projected_official = next(
-                    x for x in officials if x["officialType"] == ump_type
-                )
-                return projected_official["official"]["id"]
-            except StopIteration:
-                return "Unable to project ump."
-
+    def projected_ump_id(self):
         if not self.is_new_series:
-            return get_official(self.last_game, "First Base")
+            return Team.get_official(self.last_game, "First Base")
         elif self.next_game["liveData"]["boxscore"]["officials"]:
-            return get_official(self.next_game, "Home Plate")
+            return Team.get_official(self.next_game, "Home Plate")
         else:
             return "Unable to project ump."
 
     @cached_property
     def projected_ump_data(self):
-        return game_data[game_data["umpire"] == self.projected_ump]
+        return game_data[game_data["umpire"] == self.projected_ump_id]
 
     @cached_property
     def next_venue(self):
@@ -1498,7 +1427,6 @@ class Team(metaclass=IterTeam):
     @cached_property
     def used_rp_names(self):
         if self.used_rp:
-
             pitcher_df = self.bullpen[self.bullpen["mlb_id"].isin(self.used_rp)]
             return pitcher_df["name"]
         return None
@@ -1518,9 +1446,6 @@ class Team(metaclass=IterTeam):
     def was_dh(self):
         return True
         # return self.last_game['gameData']['teams']['home']['league']['id'] == 103
-
-    # @cached_property
-    # def
 
     @cached_property
     def next_venue_boost(self):
@@ -1653,7 +1578,7 @@ class Team(metaclass=IterTeam):
                 self.next_venue_data["wind_direction"].isin(mac.weather.wind_in)
             ]
             wind_out = self.next_venue_data[
-                self.next_venue_data["wind_direction"].isin(mac.weather.wind_out)
+                self.next_vendef ue_data["wind_direction"].isin(mac.weather.wind_out)
             ]
             if (
                 len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
@@ -1670,28 +1595,7 @@ class Team(metaclass=IterTeam):
                             return wind_in["fd_points"].mean()
 
         return self.next_venue_data["fd_points"].mean()
-
-    @cached_property
-    def temp_boost(self):
-        if self.venue_temp:
-            count = 0
-            mult = 0.01
-            temp = self.venue_temp
-            data = game_data[game_data["condition"].isin(mac.weather.roof_open)]
-            if len(data.index) < 10000:
-                stop = len(data.index) * 0.1
-            else:
-                stop = 1000
-            while count < stop:
-
-                print(self.name)
-                df = data[data['temp'].between(temp - mult, temp + mult, inclusive='neither')]
-
-                count = len(df.index)
-                mult += 1
-            return df["fd_points"].mean() / game_data["fd_points"].mean()
-        return 1
-
+    
     @cached_property
     def temp_avg(self):
         if self.venue_temp:
@@ -1704,21 +1608,17 @@ class Team(metaclass=IterTeam):
             else:
                 stop = 1000
             while count < stop:
-
-                print(len(data.index))
-                print(temp)
                 df = data[data['temp'].between(temp - mult, temp + mult, inclusive='neither')]
-                print(len(df.index))
                 count = len(df.index)
                 mult += 1
-            print('made it out of loop')
-            print(df['fd_points'].mean())
             return df['fd_points'].mean()
         return game_data['fd_points'].mean()
 
-    @staticmethod
-    def find_accurate_sample(team_instance, mult, data):
-        pass
+    @cached_property
+    def temp_boost(self):
+        if self.venue_temp:
+            return self.temp_avg / game_data["fd_points"].mean()
+        return 1
 
     @cached_property
     def ump_boost(self):
@@ -1738,13 +1638,12 @@ class Team(metaclass=IterTeam):
     @cached_property
     def env_avg(self):
         temp = self.temp_avg
-        # ump = self.ump_avg
+        ump = self.ump_avg
         venue = self.venue_avg
         if self.roof_closed:
             sample = game_data[game_data["condition"].isin(mac.weather.roof_closed)]
             temp = sample["fd_points"].mean()
-        return (temp + venue) / 2
-
+        return ((temp * settings.ENV_TEMP_WEIGHT) + (venue * settings.ENV_VENUE_WEIGHT) + (ump * settings.ENV_UMP_WEIGHT))
     def sp_avg(self, return_full_dict=False):
         away = game_data[(game_data["away_sp"] == self.opp_sp["id"])]
         home = game_data[(game_data["home_sp"] == self.opp_sp["id"])]
@@ -1814,8 +1713,7 @@ class Team(metaclass=IterTeam):
             bp['fd_wpa_b_rp'] = bp['fd_wpa_b_rp'] * settings.TIRED_BP_INCREASE
             bp['fd_wpa_b_vr'] = bp['fd_wpa_b_vr'] * settings.TIRED_BP_INCREASE
             bp['fd_wpa_b_vl'] = bp['fd_wpa_b_vl'] * settings.TIRED_BP_INCREASE
-        Team.pickle_dump(bp, file)
-
+        pickle_dump(bp, file)
         return bp
 
     @cached_property
@@ -1823,11 +1721,10 @@ class Team(metaclass=IterTeam):
         file = pickle_path(name=f"{self.name}_bp_{tf.today}", directory=settings.BP_DIR)
         path = settings.BP_DIR.joinpath(file)
         if path.exists():
-            bp = pd.read_pickle(path)
-            return bp
-        bp = self.bullpen
-
-        return bp
+            bullpen = pd.read_pickle(path)
+        else:
+            bullpen = self.bullpen
+        return bullpen
 
     @cached_property
     def proj_opp_bp(self):
@@ -1900,185 +1797,43 @@ class Team(metaclass=IterTeam):
             name=f"{self.name}_next_game_{tf.today}", directory=settings.GAME_DIR
         )
         path = settings.GAME_DIR.joinpath(file)
+        ## TODO delete the file at some point
         if not path.exists() and self.weather:
-            di = Team.daily_info()
-            n = self.name
-            if n in di["confirmed_lu"] and n in di["confirmed_sp"]:
+            daily_info = Team.daily_info()
+            name = self.name
+            if name in daily_info["confirmed_lu"] and name in daily_info["confirmed_sp"]:
                 game = self.next_game
-                Team.pickle_dump(game, file)
-                print(f"Cached {self.name} next game.")
+                pickle_dump(game, file)
+                print(f"Cached {self.name}' next game.")
         return None
-
-    @staticmethod
-    def non_rested_teams(travel_only=True):
-        no_rest = {"away": set(), "home": set()}
-        for t in Team:
-            if not t.no_rest:
-                continue
-            if travel_only:
-                if t.no_rest_travel and t.is_home:
-                    no_rest["home"].add(t.name)
-                elif t.no_rest_travel and not t.is_home:
-                    no_rest["away"].add(t.name)
-            else:
-                if not t.no_rest:
-                    continue
-                if t.no_rest and t.is_home:
-                    no_rest["home"].add(t.name)
-                elif t.no_rest and not t.is_home:
-                    no_rest["away"].add(t.name)
-        return no_rest
-
-    @staticmethod
-    def team_notes(team, opponent=None, p_hand=None, p_name=None, extend=False):
-        if not opponent:
-            opponent = team.opp_instance
-        if not p_name:
-            p_name = team.opp_sp["lastName"]
-        if not p_hand:
-            p_hand = team.opp_sp_hand
-        hitters = team.hitter
-        pitchers = opponent.pitcher
-        pitcher = pitchers[pitchers["name"].str.contains(p_name)]
-        print(f"Report for {team.name} vs. {team.opp_name}:")
-        print(
-            pitcher[
-                [
-                    "name",
-                    "fd_wps_b_vr",
-                    "fd_wps_b_vl",
-                    "batters_faced_vl",
-                    "pitches_start",
-                    "mlb_id",
-                ]
-            ]
-        )
-        print(team.sp_avg(return_full_dict=True))
-        if p_hand == "R":
-            print(
-                team.lineup_df()[
-                    ["name", "fd_wpa_pa_vr", "pa_vr", "fd_hr_weight_vr", "bat_side"]
-                ]
-            )
-            print(team.lineup_df()["fd_wpa_pa_vr"].describe())
-
-        elif p_hand == "L":
-            print(
-                team.lineup_df()[
-                    ["name", "fd_wpa_pa_vl", "pa_vl", "fd_hr_weight_vl", "bat_side"]
-                ]
-            )
-            print(team.lineup_df()["fd_wpa_pa_vl"].describe())
-        else:
-            print(
-                team.lineup_df()[
-                    ["name", "fd_wpa_pa", "pa", "fd_hr_weight", "bat_side"]
-                ]
-            )
-            print(team.lineup_df()["fd_wpa_pa"].describe())
-        print(f"{p_name} is {p_hand}")
-        print(
-            pitcher[
-                [
-                    "name",
-                    "fd_wpa_b_vr",
-                    "fd_wpa_b_vl",
-                    "batters_faced_vl",
-                    "pitches_start",
-                ]
-            ]
-        )
-        if p_hand == "R":
-            print(
-                team.lineup_df()[
-                    [
-                        "name",
-                        "fd_wps_pa_vr",
-                        "fd_wps_pa_vl",
-                        "pa_vr",
-                        "fd_hr_weight_vr",
-                        "bat_side",
-                    ]
-                ]
-            )
-            print(team.lineup_df()["fd_wps_pa_vr"].describe())
-        elif p_hand == "L":
-            print(
-                team.lineup_df()[
-                    [
-                        "name",
-                        "fd_wps_pa_vl",
-                        "fd_wps_pa_vr",
-                        "pa_vl",
-                        "fd_hr_weight_vl",
-                        "bat_side",
-                    ]
-                ]
-            )
-            print(team.lineup_df()["fd_wps_pa_vl"].describe())
-        else:
-            print(
-                team.lineup_df()[
-                    ["name", "fd_wps_pa", "pa", "fd_hr_weight", "bat_side"]
-                ]
-            )
-            print(team.lineup_df()["fd_wps_pa"].describe())
-        print(f"{opponent.name} bp ovr:{team.proj_opp_bp['fd_wpa_b_rp'].mean()}")
-        print(f"{opponent.name} bp vr:{team.proj_opp_bp['fd_wpa_b_vr'].mean()}")
-        print(f"{opponent.name} bp vl:{team.proj_opp_bp['fd_wpa_b_vl'].mean()}")
-        print(len(opponent.used_rp))
-        print(f"Current lineup for {team.name}:")
-        print(team.lineup)
-        print("RP used yesterday:")
-        print(opponent.used_rp_names)
-        bullpen = opponent.bullpen[opponent.bullpen["status"] == "A"]
-        print(
-            bullpen[
-                [
-                    "name",
-                    "pitch_hand",
-                    "fd_wpa_b_rp",
-                    "games_21",
-                    "batters_faced_rp",
-                    "status",
-                ]
-            ].sort_values(by="games_21", ascending=False)
-        )
-        if extend:
-            print(hitters[["name", "mlb_id", "fd_wps_pa_vr"]])
-            print(team.lineup_df()[["name", "mlb_id"]])
-            print("Weather input:")
-            print(team.weather)
-        return None
-
-
-angels = Team(mlb_id = 108, name = 'angels')
-astros = Team(mlb_id = 117, name = 'astros')
-athletics = Team(mlb_id = 133, name = 'athletics')
-blue_jays = Team(mlb_id = 141, name = 'blue jays')
-braves = Team(mlb_id = 144, name = 'braves')
-brewers = Team(mlb_id = 158, name = 'brewers')
-cardinals = Team(mlb_id = 138, name = 'cardinals')
-cubs = Team(mlb_id = 112, name = 'cubs')
-diamondbacks = Team(mlb_id = 109, name = 'diamondbacks')
-dodgers = Team(mlb_id = 119, name = 'dodgers')
-giants = Team(mlb_id = 137, name = 'giants')
-guardians = Team(mlb_id = 114, name = 'guardians')
-mariners = Team(mlb_id = 136, name = 'mariners')
-marlins = Team(mlb_id = 146, name = 'marlins')
-mets = Team(mlb_id = 121, name = 'mets')
-nationals = Team(mlb_id = 120, name = 'nationals') 
-orioles = Team(mlb_id = 110, name = 'orioles')
-phillies = Team(mlb_id = 143, name = 'phillies')
-pirates = Team(mlb_id = 134, name = 'pirates')
-padres = Team(mlb_id = 135, name = 'padres')
-rays = Team(mlb_id = 139, name = 'rays')
-rangers = Team(mlb_id = 140, name = 'rangers')
-red_sox = Team(mlb_id = 111, name = 'red sox')
-reds = Team(mlb_id = 113, name = 'reds')
-rockies = Team(mlb_id = 115, name = 'rockies')
-royals = Team(mlb_id = 118, name = 'royals')
-tigers = Team(mlb_id = 116, name = 'tigers')
-twins = Team(mlb_id = 142, name = 'twins')
-white_sox = Team(mlb_id = 145, name = 'white sox')
-yankees = Team(mlb_id = 147, name = 'yankees')
+if __name__ == "__main__":
+    angels = Team(mlb_id = 108, name = 'angels')
+    astros = Team(mlb_id = 117, name = 'astros')
+    athletics = Team(mlb_id = 133, name = 'athletics')
+    blue_jays = Team(mlb_id = 141, name = 'blue jays')
+    braves = Team(mlb_id = 144, name = 'braves')
+    brewers = Team(mlb_id = 158, name = 'brewers')
+    cardinals = Team(mlb_id = 138, name = 'cardinals')
+    cubs = Team(mlb_id = 112, name = 'cubs')
+    diamondbacks = Team(mlb_id = 109, name = 'diamondbacks')
+    dodgers = Team(mlb_id = 119, name = 'dodgers')
+    giants = Team(mlb_id = 137, name = 'giants')
+    guardians = Team(mlb_id = 114, name = 'guardians')
+    mariners = Team(mlb_id = 136, name = 'mariners')
+    marlins = Team(mlb_id = 146, name = 'marlins')
+    mets = Team(mlb_id = 121, name = 'mets')
+    nationals = Team(mlb_id = 120, name = 'nationals') 
+    orioles = Team(mlb_id = 110, name = 'orioles')
+    phillies = Team(mlb_id = 143, name = 'phillies')
+    pirates = Team(mlb_id = 134, name = 'pirates')
+    padres = Team(mlb_id = 135, name = 'padres')
+    rays = Team(mlb_id = 139, name = 'rays')
+    rangers = Team(mlb_id = 140, name = 'rangers')
+    red_sox = Team(mlb_id = 111, name = 'red sox')
+    reds = Team(mlb_id = 113, name = 'reds')
+    rockies = Team(mlb_id = 115, name = 'rockies')
+    royals = Team(mlb_id = 118, name = 'royals')
+    tigers = Team(mlb_id = 116, name = 'tigers')
+    twins = Team(mlb_id = 142, name = 'twins')
+    white_sox = Team(mlb_id = 145, name = 'white sox')
+    yankees = Team(mlb_id = 147, name = 'yankees')
