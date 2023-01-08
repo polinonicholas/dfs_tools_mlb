@@ -1,4 +1,6 @@
 from dfs_tools_mlb.utils.strings import ids_string
+from dfs_tools_mlb.utils.time import time_frames as tf
+from dfs_tools_mlb.compile import current_season as cs
 from dfs_tools_mlb.compile.historical_data import current_season
 from dfs_tools_mlb.utils.storage import pickle_path
 from dfs_tools_mlb import settings
@@ -628,13 +630,19 @@ def get_p_diff(player_id, season1, season2, filt1="", filt2=""):
         end1 = filt1.get("end", pd.to_datetime("today"))
         start1 = filt1["start"]
         df1 = df1[(df1["date"] >= start1) & (df1["date"] < end1)].reset_index()
-        print("xxxxx")
     if filt1:
         end2 = filt2.get("end", pd.to_datetime("today"))
         start2 = filt2["start"]
         df2 = df2[(df2["date"] >= start2) & (df2["date"] < end2)].reset_index()
-        print("yyyyyy")
     speed_diff = df1["effectiveSpeed"].max() - df2["effectiveSpeed"].max()
     spin_diff = df1["releaseSpinRate"].max() - df2["releaseSpinRate"].max()
     launch_diff = df1["launchAngle"].max() - df2["launchAngle"].max()
     return {"speed": speed_diff, "spin": spin_diff, "launch": launch_diff}
+def h_recent_statcast(i_id, year=int(cs['season_id']), hitter_statcast_time=str(tf.fifteen_days)):
+    hitter_plays = get_statcast_h(i_id, year)
+    filtered_hitter_plays = hitter_plays[
+        (hitter_plays["date"] >= hitter_statcast_time)
+    ].reset_index()
+    filtered_hitter_plays["distance"].count()
+    return filtered_hitter_plays.describe()
+

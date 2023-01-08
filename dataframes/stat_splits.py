@@ -33,11 +33,14 @@ if not data_path_h.exists() or not data_path_p.exists():
             print(
                 f"Pickled weights file is missing from \
                   {settings.ARCHIVE_DIR.joinpath('weighted_runs_df.pickle')}\
-                  , as is downloaded CSV file. Obtain one at \
-                      https://www.fangraphs.com/guts.aspx?type=cn"
+                  , as is downloaded CSV file - obtain one at: \
+                      https://www.fangraphs.com/guts.aspx?type=cn \
+                          Make sure file is named 'Fangraphs Leaderboard' in \
+                              {settings.DL_FOLDER} (downloads folded specified in \
+                                                    dfs_tools_mlb.settings)"
             )
 
-    weights = weights[weights["Season"] > settings.SEASON_WEIGHT_START]
+    weights = weights[weights["Season"] >= settings.SEASON_WEIGHT_START]
     weight_bb = weights["wBB"].mean()
     weight_hbp = weights["wHBP"].mean()
     weight_1b = weights["w1B"].mean()
@@ -50,7 +53,7 @@ if not data_path_h.exists() or not data_path_p.exists():
 if not data_path_h.exists():
     h_splits = pd.DataFrame(
         get_splits_h(
-            range(settings.stat_range["player_start"], settings.stat_range["end"]),
+            range(settings.stat_range["hitter_start"], settings.stat_range["end"]),
             sport=1,
             pool="ALL",
             get_all=True,
@@ -127,6 +130,10 @@ if not data_path_h.exists():
         + h_splits["k_vr"]
         + h_splits["gidp_vr"]
     ) - h_splits["sacs_vr"]
+    
+    h_splits['reached_base'] = h_splits['hits'] + h_splits['bb'] + h_splits['hbp']
+    h_splits['rb-_pa'] = (h_splits['reached_base'] - (h_splits['cs'] + h_splits['gidp'])) / h_splits['pa']
+    
 
     h_splits["gb_fb_vl"] = h_splits["gb_vl"] / h_splits["fb_vl"]
     h_splits["k_pa_vl"] = h_splits["k_vl"] / h_splits["pa_vl"]
@@ -148,6 +155,9 @@ if not data_path_h.exists():
         + h_splits["k_vl"]
         + h_splits["gidp_vl"]
     ) - h_splits["sacs_vl"]
+    h_splits['reached_base_vl'] = h_splits['hits_vl'] + h_splits['bb_vl'] + h_splits['hbp_vl']
+    h_splits['rb-_pa_vl'] = (h_splits['reached_base_vl'] - (h_splits['cs_vl'] + h_splits['gidp_vl'])) / h_splits['pa_vl']
+    
 
     # weight points scored/pa by type.
     h_splits["fd_bb_weight_vr"] = (
@@ -181,6 +191,8 @@ if not data_path_h.exists():
         + h_splits["fd_hr_weight_vr"]
         + h_splits["fd_sb_weight_vr"]
     )
+    h_splits['reached_base_vr'] = h_splits['hits_vr'] + h_splits['bb_vr'] + h_splits['hbp_vr']
+    h_splits['rb-_pa_vr'] = (h_splits['reached_base_vr'] - (h_splits['cs_vr'] + h_splits['gidp_vr'])) / h_splits['pa_vr']
 
     h_splits["fd_bb_weight_vl"] = (
         (h_splits["bb_vl"] * b) + ((h_splits["bb_vl"] * weight_bb) * r)
@@ -348,37 +360,35 @@ if not data_path_p.exists():
 
     p_splits = pd.DataFrame(
         get_splits_p(
-            range(settings.stat_range["player_start"], settings.stat_range["end"]),
+            range(settings.stat_range["pitcher_start"], settings.stat_range["end"]),
             sport=1,
             pool="ALL",
             get_all=True,
         )
     )
-
+    
+    
+    
+    
     first_season = cs["season_id"][-2:]
     second_season = str(int(cs["season_id"][-2:]) - 1)
-    values = {
-        f"games_sp_{first_season}": 0,
-        f"games_{first_season}": 0,
-        f"wins_{first_season}": 0,
-        f"losses_{first_season}": 0,
-        f"saves_{first_season}": 0,
-        f"save_chances_{first_season}": 0,
-        f"holds_{first_season}": 0,
-        f"complete_games_{first_season}": 0,
-        f"shutouts_{first_season}": 0,
-        f"games_sp_{second_season}": 0,
-        f"games_{second_season}": 0,
-        f"wins_{second_season}": 0,
-        f"losses_{second_season}": 0,
-        f"saves_{second_season}": 0,
-        f"save_chances_{second_season}": 0,
-        f"holds_{second_season}": 0,
-        f"complete_games_{second_season}": 0,
-        f"shutouts_{second_season}": 0,
-    }
-
-    p_splits.fillna(value=values, inplace=True)
+    
+    seasons= [second_season]
+    for season in seasons:
+        values = {
+            f"games_sp_{season}": 0,
+            f"games_{season}": 0,
+            f"wins_{season}": 0,
+            f"losses_{season}": 0,
+            f"saves_{season}": 0,
+            f"save_chances_{season}": 0,
+            f"holds_{season}": 0,
+            f"complete_games_{season}": 0,
+            f"shutouts_{season}": 0,
+            
+        }
+    
+        p_splits.fillna(value=values, inplace=True)
 
     p_splits["1b_vl"] = p_splits["hits_vl"] - (
         p_splits["hr_vl"] + p_splits["3b_vl"] + p_splits["2b_vl"]
@@ -410,15 +420,15 @@ if not data_path_p.exists():
         )
         p_splits["shutouts"] = p_splits["shutouts_21"] + p_splits["shutouts_22"]
     except KeyError:
-        p_splits["games_sp"] = p_splits["games_sp_21"]
-        p_splits["games"] = p_splits["games_21"]
+        p_splits["games_sp"] = p_splits["games_sp_22"]
+        p_splits["games"] = p_splits["games_22"]
         p_splits["games_rp"] = p_splits["games"] - p_splits["games_sp"]
-        p_splits["wins"] = p_splits["wins_21"]
-        p_splits["losses"] = p_splits["losses_21"]
-        p_splits["saves"] = p_splits["saves_21"]
-        p_splits["holds"] = p_splits["holds_21"]
-        p_splits["complete_games"] = p_splits["complete_games_21"]
-        p_splits["shutouts"] = p_splits["shutouts_21"]
+        p_splits["wins"] = p_splits["wins_22"]
+        p_splits["losses"] = p_splits["losses_22"]
+        p_splits["saves"] = p_splits["saves_22"]
+        p_splits["holds"] = p_splits["holds_22"]
+        p_splits["complete_games"] = p_splits["complete_games_22"]
+        p_splits["shutouts"] = p_splits["shutouts_22"]
 
     p_splits["pickoffs"] = p_splits["pickoffs_vr"] + p_splits["pickoffs_vl"]
     p_splits["gidp"] = p_splits["gidp_vr"] + p_splits["gidp_vl"]
@@ -966,12 +976,12 @@ p_q_l_vr = p_splits[l_filt & r_q_filt]
 p_q_r_vr = p_splits[r_filt & r_q_filt]
 
 adjustment_dfs = {
-    "hitting": {
+    "H": {
         "RAW": {"pitchers": hp_q, "hitters": h_q},
         "L": {"vs_l": h_l_vl, "vs_r": h_l_vr},
         "R": {"vs_l": h_r_vl, "vs_r": h_r_vr},
     },
-    "pitchers": {
+    "P": {
         "BP": {
             "L": {"vs_l": p_q_l_vl, "vs_r": p_q_r_vr},
             "R": {"vs_l": p_q_r_vl, "vs_r": p_q_l_vr},
@@ -984,3 +994,4 @@ adjustment_dfs = {
         },
     },
 }
+

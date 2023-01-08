@@ -3,7 +3,6 @@ import re
 from functools import lru_cache
 
 # from dfs_tools_mlb.utils.statsapi import event_types
-
 mlb_api_codes = Map(
     {
         "players": Map(
@@ -35,6 +34,15 @@ mlb_api_codes = Map(
                 "lhp": ["L", "N", "G"],
                 "twp": ["Y", "Z", "A", "J"],
                 "unknown": ["X"],
+                "c": 2,
+                "1b": 3,
+                "2b": 4,
+                "3b": 5,
+                "ss": 6,
+                "lf": 7,
+                "cf": 8,
+                "rf": 9,
+                "dh": 10,
             }
         ),
         "game_status": Map(
@@ -609,9 +617,9 @@ team_info = Map(
 @lru_cache
 def current_parks():
     parks = set()
-    for k in team_info:
-        if team_info[k].get("venue"):
-            parks.add(team_info[k]["venue"]["id"])
+    for team in team_info:
+        if team_info[team].get("venue"):
+            parks.add(team_info[team]["venue"]["id"])
     return parks
 
 

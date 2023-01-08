@@ -2,6 +2,9 @@ import pickle
 import pandas
 import numpy as np
 from functools import cached_property
+import random
+from itertools import combinations
+
 from dfs_tools_mlb import settings
 from dfs_tools_mlb import config
 from dfs_tools_mlb.utils.storage import pickle_path
@@ -9,9 +12,6 @@ from dfs_tools_mlb.utils.time import time_frames as tf
 from dfs_tools_mlb.compile import teams
 from dfs_tools_mlb.utils.pd import modify_team_name
 from dfs_tools_mlb.utils.pd import sm_merge_single
-import random
-
-from itertools import combinations 
 from dfs_tools_mlb.utils.sort import (sort_k_by_v,
                                       sort_list_col_by_list_order,
                                       sort_list_by_list)
@@ -56,7 +56,6 @@ class FDSlate:
             )
         p_fades.extend(settings.ppd)
         h_fades.extend(settings.ppd)
-
         no_stack.extend(h_fades)    
       
 
@@ -83,6 +82,11 @@ class FDSlate:
         self.h_drop = h_drop
         self.stack_wgts = stack_wgts
         self.tot_stack_wgt = tot_stack_wgt
+    @staticmethod
+    def clean_fd_directory():
+            from dfs_tools_mlb.utils.storage import clean_directory
+            clean_directory(settings.FD_DIR, force_delete=True)
+            return None
         
 
     def entries_df(self, reset=False):
@@ -392,6 +396,7 @@ class FDSlate:
         return df
 
     def points_df(self, refresh=False):
+        
         file = pickle_path(
             name=f"team_points_{tf.today}_{self.slate_number}",
             directory=settings.FD_DIR,
@@ -400,6 +405,7 @@ class FDSlate:
         if not path.exists() or refresh:
             self.get_hitters()
         df = pandas.read_pickle(path).apply(pandas.to_numeric)
+        df = df[~df.index.isin(self.h_fades)]
         for team in self.team_instances:
             if team.ppd and team.name in self.active_teams:
                 filt = df[(df.index == team.name) | (df.index == team.name)].index
@@ -418,38 +424,39 @@ class FDSlate:
         df['mz'] = (((df['p_z'] * (self.stack_wgts['points'] + self.stack_wgts['salary'])) + (df['sa_z'] * self.stack_wgts['opp_avg_vs']) + (df['mu_z'] * self.stack_wgts['matchup']) + (df['t_z'] * self.stack_wgts['lu_talent']) + (df['v_z'] * self.stack_wgts['venue']) + (df['e_z'] * self.stack_wgts['environment'])) / self.tot_stack_wgt)
 
         return df
+    @cached_property
+    def filtered_h_df(self):
+        df = self.h_df()
+        return df[(~df['team'].isin(self.h_fades)) & (~df['fd_id'].isin(self.h_fades)) & (~df['mlb_id'].isin(self.h_fades))]
 
     @cached_property
     def util_df(self):
-        df = self.h_df()
+        df = self.filtered_h_df
 
-        df = df[(~df['team'].isin(self.h_fades)) & (~df['fd_id'].isin(self.h_fades)) & (~df['mlb_id'].isin(self.h_fades))]
+        
         return df[df['fd_r_position'].apply(lambda x: 'util' in x)]
     @cached_property
     def first_df(self):
-        df = self.h_df()
-        df = df[(~df['team'].isin(self.h_fades)) & (~df['fd_id'].isin(self.h_fades)) & (~df['mlb_id'].isin(self.h_fades))]
+        df = self.filtered_h_df
+        
         return df[df['fd_position'].apply(lambda x: '1b' in x or 'c' in x)]
     
     @cached_property
     def second_df(self):
-        df = self.h_df()
-        df = df[(~df['team'].isin(self.h_fades)) & (~df['fd_id'].isin(self.h_fades)) & (~df['mlb_id'].isin(self.h_fades))]
+        df = self.filtered_h_df
         return df[df['fd_position'].apply(lambda x: '2b' in x)]
     @cached_property
     def ss_df(self):
-        df = self.h_df()
-        df = df[(~df['team'].isin(self.h_fades)) & (~df['fd_id'].isin(self.h_fades)) & (~df['mlb_id'].isin(self.h_fades))]
+        df = self.filtered_h_df
         return df[df['fd_position'].apply(lambda x: 'ss' in x)]
     @cached_property
     def third_df(self):
-        df = self.h_df()
-        df = df[(~df['team'].isin(self.h_fades)) & (~df['fd_id'].isin(self.h_fades)) & (~df['mlb_id'].isin(self.h_fades))]
+        df = self.filtered_h_df
         return df[df['fd_position'].apply(lambda x: '3b' in x)]
 
     @cached_property
     def of_df(self):
-        df = self.h_df()
+        df = self.filtered_h_df
         df = df[(~df["team"].isin(self.h_fades)) & (~df["fd_id"].isin(self.h_fades))]
         return df[df["fd_position"].apply(lambda x: "of" in x)]
 
@@ -473,7 +480,7 @@ class FDSlate:
                   'of': of,
                   'of.1': of,
                   'of.2': of,
-                  'util': 99999}
+                  'util': 999}
     
         return position_count_dict
     def order_pos_importance(self):
@@ -688,7 +695,7 @@ class FDSlate:
                       never_replace_primary_supreme = False,
                       expand_utility = False,
                       decrease_stack_salary = True,
-                      factor_salary_secondary = False,
+                      factor_salary_secondary = True,
                       increase_stack_salary = True,
                       increase_secondary_salary = True,
                       all_in_auto = True,
@@ -1043,11 +1050,9 @@ class FDSlate:
             else:
                 raise ValueError("Problem with function: determine_filter")
 
-        #lineups to build
-        print('prior to building')
-
+       
         while lus > 0:
-            print('building')
+           
             #if lineup fails requirements, reset will be set to true.
             reset = False
             non_random_stack = stack_list[non_random_stack_start]
@@ -1240,6 +1245,11 @@ class FDSlate:
                         positions_to_be_filled_by_stack.append('of.2')
                     elif 'util' not in positions_to_be_filled_by_stack and not lineup[position_index_map['util']]:
                          positions_to_be_filled_by_stack.append('util')
+            if len(ids_of_players_to_stack) != len(positions_to_be_filled_by_stack):
+                raise ValueError(f"Problem building stack of size {stack_size} for {stack}. Try increasing stack sample, entering a custom stack size/custom stack order for {stack}, or fading a player from that team (likely 3 players playing the same position.)")
+            # print(attempts_to_insert_stack)
+            # print(positions_to_be_filled_by_stack)
+            # return positions_to_be_filled_by_stack
                 
                         
             #if couldn't create a 4-man stack, create a 3-man stack        
@@ -1282,7 +1292,10 @@ class FDSlate:
                 stack_info = player_df.loc[player_df[select_by].isin(iter_filt), info_cols].values
                 stack_map = dict(zip(iter_zip, stack_info))
                 return stack_map
+            
             stack_map = get_stack_map(all_hitters_df, ids_of_players_to_stack, positions_to_be_filled_by_stack)
+            # if stack == 'royals':
+            #     print(stack_map)
             # calculate used salary and remaining salary after selecting pitcher/stack
             for player_information in stack_map.values():
                 salary += player_information[0]
@@ -1368,7 +1381,7 @@ class FDSlate:
                 if never_pair_sec.get(p_info['current_pitcher_fanduel_id']):
                     avoid_secondary = avoid_secondary +  never_pair_sec[p_info['current_pitcher_fanduel_id']]
 
-                if never_pair_sec.get(stack):
+                if never_pair_sec.get(stack) and not always_pair_first_sec.get(p_info['current_pitcher_fanduel_id']):
                     avoid_secondary = avoid_secondary + never_pair_sec[stack]
                 secondary_stacks = {}
 
