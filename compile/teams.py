@@ -212,13 +212,13 @@ class Team(metaclass=IterTeam):
         l_filt = Team.get_split_filter(df, "L", pitchers=True)
         r_filt = Team.get_split_filter(df, "R", pitchers=True)
         if not bullpen:
-            min_bf = MIN_BF_SP
+            min_bf = settings.MIN_BF_SP
             min_bf_sp = settings.MIN_BF_SP_SPLIT
             stats = settings.STATS_TO_ADJUST_SP
             p_col = "_sp"
             a_dfs_branch = a_dfs["P"]["SP"]
         else:
-            min_bf = MIN_BF_BP
+            min_bf = settings.MIN_BF_BP
             min_bf_sp = setting.MIN_BF_BP_SPLIT
             stats = settings.STATS_TO_ADJUST_RP
             p_col = "_rp"
@@ -276,6 +276,10 @@ class Team(metaclass=IterTeam):
     @staticmethod
     def get_game_officials(game):
         return game["liveData"]["boxscore"]["officials"]
+
+    @staticmethod
+    def get_game_pk(game):
+        return game["games"][0]["gamePk"]
 
     @staticmethod
     def get_official_id(official):
@@ -752,7 +756,6 @@ class Team(metaclass=IterTeam):
                 if self.name not in daily_info["confirmed_lu"]:
                     daily_info["confirmed_lu"].append(self.name)
                     Team.dump_json_data(settings.daily_info_file, daily_info)
-
                 self.cache_next_game()
                 return lineup
             else:
@@ -778,9 +781,8 @@ class Team(metaclass=IterTeam):
                     if play["about"]["isTopInning"] == h:
                         lineup.append(play["matchup"]["batter"]["id"])
                         if len(lineup) == 9:
-                            break
-                self.update_lineup(lineup, self.last_opp_sp_hand)
-                return lineup
+                            self.update_lineup(lineup, self.last_opp_sp_hand)
+                            return lineup
         except (KeyError, TypeError):
             return (
                 self.last_game_pk
@@ -843,13 +845,16 @@ class Team(metaclass=IterTeam):
                     hitters = hitters[~hitters["mlb_id"].isin(excluded)]
                     return hitters.loc[hitters[h_key].idxmax()]
 
-    def lineup_df(self):
-        file = pickle_path(
-            name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR
-        )
-        path = settings.LINEUP_DIR.joinpath(file)
-        daily_info = Team.daily_info()
-        def calculate_team_lu_points(self, lineup_df):
+    @staticmethod
+    def lineup_confirmed(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_lu"]
+
+    def should_reset_lineup(self):
+        if settings.reset_all_lineups:
+            return True
+        return (self.name in settings.reset_specific_lineups and not self.ppd)
+    
+    def calculate_team_lu_points(self, lineup_df):
             self.raw_points = lineup_df["exp_ps_raw"].sum()
             self.venue_points = lineup_df["venue_points"].sum()
             self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
@@ -860,9 +865,18 @@ class Team(metaclass=IterTeam):
             self.sp_mu = lineup_df["sp_mu"].sum()
             self.lu_talent_sp = lineup_df["sp_split"].sum() - lineup_df["sp_split"].std(ddof=0)
             return lineup_df
-        if not self.ppd and (self.name not in daily_info["confirmed_lu"] or self.name in settings.reset_specific_lineups or settings.reset_all_lineups):
+
+    def lineup_df(self):
+        file = pickle_path(
+            name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR
+        )
+        daily_info = Team.daily_info()
+        confirmed = Team.lineup_confirmed(daily_info, self.name)
+        reset_flag = self.should_reset_lineup())
+        path = settings.LINEUP_DIR.joinpath(file)
+        if (not confirmed or reset_flag):
             self.del_props()
-        if not path.exists() or self.name not in daily_info["confirmed_lu"] or self.name in settings.reset_specific_lineups or settings.reset_all_lineups:
+        if not path.exists() or (not confirmed or reset_flag):
             lineup_ids = self.lineup
             lineup = pd.DataFrame(lineup_ids, columns=["mlb_id"])
             roster = pd.DataFrame(self.full_roster)
@@ -881,13 +895,13 @@ class Team(metaclass=IterTeam):
                                 new_row = self.get_replacement(
                                     position, position_type, lineup_ids
                                 )
-                                index = lineup_ids.index(i_d)
-                                lineup_ids[index] = int(new_row["mlb_id"])
-                                self.update_lineup(lineup_ids, self.opp_sp_hand)
+                                idx = lineup_ids.index(i_d)
+                                lineup_ids[idx] = int(new_row["mlb_id"])
                             h_df = h_df.append(new_row, ignore_index=True)
+            self.update_lineup(lineup_ids, self.opp_sp_hand)
             sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
-            # new
             h_df = h_df.loc[~h_df.duplicated(subset=["mlb_id"])]
+            assert len(h_df.index) == 9
             h_df["order"] = h_df["mlb_id"].map(sorter)
             h_df.sort_values(by="order", inplace=True, kind="mergesort")
             h_df["order"] = h_df["order"] + 1
@@ -1448,152 +1462,121 @@ class Team(metaclass=IterTeam):
         # return self.last_game['gameData']['teams']['home']['league']['id'] == 103
 
     @cached_property
-    def next_venue_boost(self):
+    def qualified_venues(self):
+        return qualified_venue_stats(exclude=[self.next_venue])
+    
+    @cached_property
+    def wind_out(self):
+        return self.wind_direction in mac.weather.wind_out
+    
+    @cached_property
+    def wind_in(self):
+        return self.wind_direction in mac.weather.wind_in
+
+    @cached_property
+    def boost_data(self):
         if self.next_game_pk:
             data = self.next_venue_data
         else:
             data = self.home_venue_data
-        q_venues = qualified_venue_stats(
-            venue_data, exclude=[self.next_venue], series_or_columns=None
-        )
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
-            wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points"].mean() - wind_in["fd_points"].mean())
-                    / game_data["fd_points"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 1):
-                        if self.wind_direction in mac.weather.wind_out:
-                            data = wind_out
-                        if self.wind_direction in mac.weather.wind_in:
-                            data = wind_in
+        return data
+
+    @cached_property
+    def wind_data(self):
+        data = self.boost_data
+        wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
+        wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
+        return wind_in, wind_out
+
+    @cached_property
+    def wind_in_data(self):
+        return self.wind_data[0]
+    
+    @cached_property
+    def wind_out_data(self):
+        return self.wind_out_data[1]
+
+    @cached_property
+    def wind_in_or_out(self):
+        if (settings.wind_factor and not self.roof_closed):
+            return (self.wind_in or self.wind_out)
+        return False
+
+    @cached_property
+    def sufficient_wind_data(self):
+        sufficient = settings.MIN_GAMES_VENUE_WIND
+        in_sufficient = len(self.wind_in_data.index) >= sufficient
+        out_sufficient = len(self.wind_out_data.index) >= sufficient
+        return all(in_sufficient, out_sufficient)
+
+    @cached_property
+    def logical_wind_data(self):
+        wind_in_mean = self.wind_in_data["fd_points"].mean()
+        wind_out_mean = self.wind_out_data["fd_points"].mean()
+        return (wind_in_mean < wind_out_mean)
+
+    @cached_property
+    def sufficient_wind_speed(self):
+        return (self.wind_speed >= (game_data["wind_speed"].median() - 1))
+
+    @cached_property
+    def wind_factor(self):
+        is_factor = all(
+                        self.wind_in_or_out,
+                        self.sufficient_wind_data,
+                        self.logical_wind_data,
+                        self.sufficient_wind_speed
+                        )
+        return is_factor
+
+    @cached_property
+    def next_venue_boost_data(self):
+        data = self.boost_data
+        
+        if self.wind_factor:
+            if self.wind_out:
+                data = self.wind_out_data
+            elif self.wind_in:
+                data = self.wind_in_data
+        return data
+
+    @cached_property
+    def next_venue_boost(self):
+        data = self.next_venue_boost_data
+        q_venues = self.qualified_venues
         pts_pa_next_venue = data["fd_points"].sum() / data["adj_pa"].sum()
         pts_pa_q_venues = q_venues["fd_pts_pa"].mean()
-        return pts_pa_next_venue / pts_pa_q_venues
-
-    @cached_property
-    def next_venue_boost_lhb(self):
-        if self.next_game_pk:
-            data = self.next_venue_data
-        else:
-            data = self.home_venue_data
-
-        q_venues = qualified_venue_stats(
-            venue_data, exclude=[self.next_venue], series_or_columns=None
-        )
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
-            wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points_lhb"].mean() - wind_in["fd_points_lhb"].mean())
-                    / game_data["fd_points_lhb"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 0.5):
-                        if self.wind_direction in mac.weather.wind_out:
-                            data = wind_out
-                        if self.wind_direction in mac.weather.wind_in:
-                            data = wind_in
         lhb_pts_pa_next_venue = data["fd_points_lhb"].sum() / data["adj_pa_lhb"].sum()
         lhb_pts_pa_q_venues = q_venues["fd_pts_pa_lhb"].mean()
-        return lhb_pts_pa_next_venue / lhb_pts_pa_q_venues
-
-    @cached_property
-    def next_venue_boost_rhb(self):
-        if self.next_game_pk:
-            data = self.next_venue_data
-        else:
-            data = self.home_venue_data
-
-        q_venues = qualified_venue_stats(
-            venue_data, exclude=[self.next_venue], series_or_columns=None
-        )
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
-            wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points_rhb"].mean() - wind_in["fd_points_rhb"].mean())
-                    / game_data["fd_points_rhb"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 0.5):
-                        if self.wind_direction in mac.weather.wind_out:
-                            data = wind_out
-                        if self.wind_direction in mac.weather.wind_in:
-                            data = wind_in
         rhb_pts_pa_next_venue = data["fd_points_rhb"].sum() / data["adj_pa_rhb"].sum()
         rhb_pts_pa_q_venues = q_venues["fd_pts_pa_rhb"].mean()
-        return rhb_pts_pa_next_venue / rhb_pts_pa_q_venues
+        self.next_venue_boost_lhb = lhb_pts_pa_next_venue / lhb_pts_pa_q_venues
+        self.next_venue_boost_rhb = rhb_pts_pa_next_venue / rhb_pts_pa_q_venues
+        return pts_pa_next_venue / pts_pa_q_venues
+
+    # @cached_property
+    # def next_venue_boost_lhb(self):
+    #     q_venues = self.qualified_venues
+    #     data = self.next_venue_boost_data
+    #     lhb_pts_pa_next_venue = data["fd_points_lhb"].sum() / data["adj_pa_lhb"].sum()
+    #     lhb_pts_pa_q_venues = q_venues["fd_pts_pa_lhb"].mean()
+    #     return lhb_pts_pa_next_venue / lhb_pts_pa_q_venues
+
+    # @cached_property
+    # def next_venue_boost_rhb(self):
+    #     q_venues = self.qualified_venues
+    #     data = self.next_venue_boost_data
+    #     rhb_pts_pa_next_venue = data["fd_points_rhb"].sum() / data["adj_pa_rhb"].sum()
+    #     rhb_pts_pa_q_venues = q_venues["fd_pts_pa_rhb"].mean()
+    #     return rhb_pts_pa_next_venue / rhb_pts_pa_q_venues
 
     @cached_property
     def venue_avg(self):
-        # rangers ballpark skewed
-        if self.next_venue == 5325:
-            if not self.roof_closed:
-                return game_data["fd_points"].mean() * 1
-            else:
-                return game_data["fd_points"].mean() * 1
-
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = self.next_venue_data[
-                self.next_venue_data["wind_direction"].isin(mac.weather.wind_in)
-            ]
-            wind_out = self.next_venue_data[
-                self.next_vendef ue_data["wind_direction"].isin(mac.weather.wind_out)
-            ]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points"].mean() - wind_in["fd_points"].mean())
-                    / game_data["fd_points"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 1):
-                        if self.wind_direction in mac.weather.wind_out:
-                            return wind_out["fd_points"].mean()
-                        if self.wind_direction in mac.weather.wind_in:
-                            return wind_in["fd_points"].mean()
-
+        if self.wind_factor:
+            if self.wind_out:
+                return self.wind_out_data["fd_points"].mean()
+            if self.wind_in:
+                return self.wind_in_data["fd_points"].mean()
         return self.next_venue_data["fd_points"].mean()
     
     @cached_property
@@ -1643,7 +1626,10 @@ class Team(metaclass=IterTeam):
         if self.roof_closed:
             sample = game_data[game_data["condition"].isin(mac.weather.roof_closed)]
             temp = sample["fd_points"].mean()
-        return ((temp * settings.ENV_TEMP_WEIGHT) + (venue * settings.ENV_VENUE_WEIGHT) + (ump * settings.ENV_UMP_WEIGHT))
+        return ((temp * settings.ENV_TEMP_WEIGHT) + 
+                (venue * settings.ENV_VENUE_WEIGHT) + 
+                (ump * settings.ENV_UMP_WEIGHT))
+
     def sp_avg(self, return_full_dict=False):
         away = game_data[(game_data["away_sp"] == self.opp_sp["id"])]
         home = game_data[(game_data["home_sp"] == self.opp_sp["id"])]
@@ -1737,17 +1723,19 @@ class Team(metaclass=IterTeam):
         for team in Team:
             if team.name == self.opp_name:
                 return team
+              
+    def get_past_games(self, number_of_games):
+        return self.past_games[-number_of_games:]
 
     def rested_sp(self, return_used_ids=False):
         if self.last_game_pk:
             try:
-                games = self.past_games[-4:]
+                games = self.get_past_games(4)
             except IndexError:
                 games = self.past_games
             game_ids = []
             for game in games:
-
-                game_ids.append(game["games"][0]["gamePk"])
+                game_ids.append(Team.get_game_pk(game))
             game_ids = ids_string(game_ids)
             call = statsapi.get(
                 "schedule",
