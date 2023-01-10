@@ -72,11 +72,7 @@ class Team(metaclass=IterTeam):
 
     @staticmethod
     def roster_dict(instance, roster_type, is_depth=False):
-        hydrate = settings.api_hydrate["p_info"]
-        call = statsapi.get(
-            "team_roster",
-            {"teamId": instance.id, "rosterType": roster_type, "hydrate": hydrate},
-        )["roster"]
+        call = Team.get_roster_api(instance.id, roster_type)
         if not is_depth:
             info = []
             for p in call:
@@ -114,9 +110,9 @@ class Team(metaclass=IterTeam):
         """
         """
         if hitters:
-            return df1.join(h_splits.set_index(column), on=col, rsuffix='_drop')
+            return df1.join(h_splits.set_index(col), on=col, rsuffix='_drop')
         else:
-            return df1.join(p_splits.set_index(column), on=col, rsuffix='_drop')
+            return df1.join(p_splits.set_index(col), on=col, rsuffix='_drop')
     
     @staticmethod
     def get_player_api(player_id):
@@ -125,6 +121,15 @@ class Team(metaclass=IterTeam):
     @staticmethod
     def get_game_api(game_id):
         return statsapi.get("game", {"gamePk": game_id})
+
+    @staticmethod
+    def get_roster_api(teamid, roster_type):
+        hydrate = settings.api_hydrate["p_info"]
+        call = statsapi.get(
+            "team_roster",
+            {"teamId": teamid, "rosterType": roster_type, "hydrate": hydrate},
+                          )["roster"]
+        return call
 
     @staticmethod
     def dump_json_data(file, json_data):
@@ -280,6 +285,10 @@ class Team(metaclass=IterTeam):
     @staticmethod
     def get_game_pk(game):
         return game["games"][0]["gamePk"]
+    
+    @staticmethod
+    def get_game_plays(game):
+        return game["liveData"]["plays"]["allPlays"]
 
     @staticmethod
     def get_official_id(official):
@@ -437,7 +446,6 @@ class Team(metaclass=IterTeam):
         pitchers = self.starter.combine_first(self.bullpen)
         return pitchers
 
-
     @cached_property
     def coaches(self):
         ## TODO functin to get coaches, coach dict in mlb_static.py
@@ -483,6 +491,7 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def all_games(self):
+        
         file = pickle_path(
             name=f"{self.name}_schedule_{tf.today}", directory=settings.SCHED_DIR
         )
@@ -490,20 +499,13 @@ class Team(metaclass=IterTeam):
         if path.exists():
             schedule = pd.read_pickle(path)
         else:
-            schedule = full_schedule(team=self.id, start_date=cs.spring_start, end_date=cs.playoff_end)
+            schedule = full_schedule(
+                                     team=self.id, 
+                                     start_date=cs.spring_start, 
+                                     end_date=cs.playoff_end
+                                     )
             pickle_dump(schedule, file)
         return schedule
-
-    def clear_team_cache(self, directories=settings.VITAL_DIR_LIST):
-        for d in directories:
-            for file in Path.iterdir(d):
-                if not file.is_dir() and self.name in str(file):
-                    file.unlink()
-        return f"Cleared cache for {self.name}."
-
-    def clear_all_team_cache(self):
-        self.clear_team_cache(directories=settings.VITAL_DIR_LIST)
-        return f"Cleared vital directories for {self.name}."
 
     @cached_property
     def future_games(self):
@@ -550,21 +552,18 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def last_game(self):
-
-        file = pickle_path(
-            name=f"{self.name}_last_game_{tf.today}", directory=settings.GAME_DIR
-        )
-        path = settings.GAME_DIR.joinpath(file)
-        if path.exists():
-            game = pd.read_pickle(path)
-            return game
-
-            # if not game['gameData']['game']['doubleHeader'] == 'Y' and game['gameData']['gameNumber'] == 1:
-            #     return game
         if self.last_game_pk:
-            print(f"Getting boxscore {self.name.capitalize()}' last game.")
-            game = Team.get_game_api(self.last_game_pk)
-            pickle_dump(game, file)
+            file = pickle_path(
+                name=f"{self.name}_last_game_{tf.today}", directory=settings.GAME_DIR
+            )
+            path = settings.GAME_DIR.joinpath(file)
+            if path.exists():
+                game = pd.read_pickle(path)
+            else:
+                # if not game['gameData']['game']['doubleHeader'] == 'Y' ???
+                print(f"Getting boxscore {self.name.capitalize()}' last game.")
+                game = Team.get_game_api(self.last_game_pk)
+                pickle_dump(game, file)
             return game
         return self.last_game_pk
 
@@ -626,9 +625,7 @@ class Team(metaclass=IterTeam):
         sp_id = self.probable_pitcher_id_string(home_or_away)
         return self.next_game["gameData"]["players"][sp_id]
 
-    @staticmethod
-    def check_confirmed_sp(current_daily_info, teamname):
-        return teamname in current_daily_info["confirmed_sp"]
+    
 
     @cached_property
     def opp_sp(self):
@@ -762,32 +759,30 @@ class Team(metaclass=IterTeam):
                 return self.projected_lineup
         return self.next_game_pk
 
+    
+
     @cached_property
     def projected_lineup(self):
         print(f"Getting projected lineup for {self.name}")
         team_lineups = Team.lineups()
         try:
-            #i do this because 
             if len(team_lineups[self.name][self.opp_sp_hand]) == 9:
                 return team_lineups[self.name][self.opp_sp_hand]
             else:
                 lineup = []
-                plays = self.last_game["liveData"]["plays"]["allPlays"]
+                plays = Team.get_game_plays(self.last_game)
                 if self.was_home:
-                    h = False
+                    top_inning = False
                 else:
-                    h = True
+                    top_inning = True
                 for play in plays:
-                    if play["about"]["isTopInning"] == h:
+                    if play["about"]["isTopInning"] == top_inning:
                         lineup.append(play["matchup"]["batter"]["id"])
                         if len(lineup) == 9:
                             self.update_lineup(lineup, self.last_opp_sp_hand)
                             return lineup
         except (KeyError, TypeError):
-            return (
-                self.last_game_pk
-                + "projected lineup will be available after first spring training game."
-            )
+            return self.last_game_pk
 
     def update_lineup(self, lineup, hand):
         team_lineups = Team.lineups()
@@ -846,8 +841,12 @@ class Team(metaclass=IterTeam):
                     return hitters.loc[hitters[h_key].idxmax()]
 
     @staticmethod
-    def lineup_confirmed(current_daily_info, teamname):
+    def check_confirmed_lineup(current_daily_info, teamname):
         return teamname in current_daily_info["confirmed_lu"]
+
+    @staticmethod
+    def check_confirmed_sp(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_sp"]
 
     def should_reset_lineup(self):
         if settings.reset_all_lineups:
@@ -865,13 +864,76 @@ class Team(metaclass=IterTeam):
             self.sp_mu = lineup_df["sp_mu"].sum()
             self.lu_talent_sp = lineup_df["sp_split"].sum() - lineup_df["sp_split"].std(ddof=0)
             return lineup_df
+    
+    @staticmethod
+    def add_missing_players_h_df(h_df, ids):
+        for i_d in [i_d for i_d in ids if i_d not in h_df["mlb_id"].values]:
+            player = Team.get_player_api(i_d)
+            position = player["primaryPosition"]["code"]
+            position_type = player["primaryPosition"]["type"]
+            new_row = self.get_replacement(position, position_type, ids)
+            idx = ids.index(i_d)
+            ids[idx] = int(new_row["mlb_id"])
+            h_df = h_df.append(new_row, ignore_index=True)
+        return h_df
+    @staticmethod
+    def set_order_h_df(h_df, ids):
+        sorter = dict(zip(ids, range(len(ids))))
+        h_df["order"] = h_df["mlb_id"].map(sorter)
+        h_df.sort_values(by="order", inplace=True, kind="mergesort")
+        h_df["order"] = h_df["order"] + 1
+        h_df.reset_index(inplace=True, drop=True)
+        return h_df
+
+    @staticmethod
+    def set_switch_hand_h_df(h_df, hand):
+        if hand == "R":
+            h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "L"
+        else:
+            h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "R"
+        return h_df
+
+    ## TODO reference the series' origin
+    @staticmethod
+    def set_pit_per_pa_h_df(h_df_series, h_df, p_df, lefties, righties):
+        splits = {"_vl": lefties, "_vr": righties}
+        h_weight = (h_df_series * settings.H_PIT_PER_AB_WGT)
+        for col, filt in splits.items():
+            p_weight = (p_df["ppb" + col].max() * settings.P_PIT_PER_AB_WGT)
+            h_df.loc[filt, 'pitches_pa_sp'] = (h_weight + p_weight)
+        return h_df
+
+    @cached_property
+    def opp_sp_df(self):
+        try:
+            p_info = self.opp_sp
+            pitcher = api_pitcher_info_dict(p_info)
+            pitcher["team"] = self.opp_name
+            p_df = Team.join_player_stats(pd.DataFrame([pitcher]), hitters=False)
+        except TypeError:
+            p_df = Team.default_sp()
+        return p_df
+
+    @staticmethod
+    def pitches_per_order(h_df, p_df):
+        l_weight = Team.get_split_filter(h_df, "L", return_percentage=True)
+        r_weight = Team.get_split_filter(h_df, "R", return_percentage=True)
+        pitches_per_lhb = (l_weight * p_df["ppb_vl"].max())
+        pitches_per_rhb = (r_weight * p_df["ppb_vr"].max())
+        return ((pitches_per_lhb + pitches_per_rhb)) * settings.LU_LENGTH
+
+    @staticmethod
+    def adjust_na_pitches_start_p_df(p_df):
+        adjustment_df = a_dfs["P"]["SP"]["RAW"]["raw"]["pitches_start"]
+        p_df["pitches_start"].fillna(adjustment_df.median(), inplace=True)
+        return p_df
 
     def lineup_df(self):
         file = pickle_path(
             name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR
         )
         daily_info = Team.daily_info()
-        confirmed = Team.lineup_confirmed(daily_info, self.name)
+        confirmed = Team.check_confirmed_lineup(daily_info, self.name)
         reset_flag = self.should_reset_lineup())
         path = settings.LINEUP_DIR.joinpath(file)
         if (not confirmed or reset_flag):
@@ -880,66 +942,33 @@ class Team(metaclass=IterTeam):
             lineup_ids = self.lineup
             lineup = pd.DataFrame(lineup_ids, columns=["mlb_id"])
             roster = pd.DataFrame(self.full_roster)
-            merged = pd.merge(lineup, roster, on="mlb_id")
-            h_df = Team.join_player_stats(merged)
-            roster = Team.join_player_stats(roster)
-            if not self.custom_lineup:
-                if len(h_df.index) < 9:
-                    for i_d in lineup_ids:
-                        if i_d not in h_df["mlb_id"].values:
-                            new_row = roster[roster["mlb_id"] == i_d]
-                            if len(new_row.index) == 0:
-                                player = Team.get_player_api(i_d)
-                                position = player["primaryPosition"]["code"]
-                                position_type = player["primaryPosition"]["type"]
-                                new_row = self.get_replacement(
-                                    position, position_type, lineup_ids
-                                )
-                                idx = lineup_ids.index(i_d)
-                                lineup_ids[idx] = int(new_row["mlb_id"])
-                            h_df = h_df.append(new_row, ignore_index=True)
-            self.update_lineup(lineup_ids, self.opp_sp_hand)
-            sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
+            h_df = Team.join_player_stats(pd.merge(lineup, roster, on="mlb_id"))
+            if not self.custom_lineup and len(h_df.index) < 9:
+                h_df = Team.add_missing_players_h_df(h_df, lineup_ids)
             h_df = h_df.loc[~h_df.duplicated(subset=["mlb_id"])]
-            assert len(h_df.index) == 9
-            h_df["order"] = h_df["mlb_id"].map(sorter)
-            h_df.sort_values(by="order", inplace=True, kind="mergesort")
-            h_df["order"] = h_df["order"] + 1
-            h_df.reset_index(inplace=True, drop=True)
-            if self.opp_sp_hand == "R":
-                h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "L"
-            else:
-                h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "R"
-
+            assert len(h_df.index) == 9, f"{self.name}' has {len(hf.index)} players."
+            h_df = Team.set_order_h_df(h_df, lineup_ids)
+            h_df = Team.set_switch_hand_h_df(h_df, self.opp_sp_hand)
             h_df = Team.adjust_non_qualified_h(h_df)
-
-            try:
-                p_info = self.opp_sp
-                player = api_pitcher_info_dict(p_info)
-                player["team"] = self.opp_name
-                Team.join_player_stats(pd.DataFrame([player]), hitters=False)
-            except TypeError:
-                p_df = Team.default_sp()
-
+            p_df = self.opp_sp_df
             lefties = Team.get_split_filter(h_df, "L")
             righties = Team.get_split_filter(h_df, "R")
-            l_weight = Team.get_split_filter(h_df, "L", return_percentage=True)
-            r_weight = Team.get_split_filter(h_df, "R", return_percentage=True)
             p_df = Team.adjust_non_qualified_p(p_df)
-            p_ppb = (
-                (l_weight * p_df["ppb_vl"].max()) + (r_weight * p_df["ppb_vr"].max())
-            ) * settings.LU_LENGTH
+            # p_ppb = Team.pitches_per_order(h_df, p_df)
 
             if not self.opp_instance.custom_pps:
-                p_df["pitches_start"].fillna(
-                    a_dfs["P"]["SP"]["RAW"]["raw"]["pitches_start"].median(),
-                    inplace=True,
-                )
+                p_df = Team.adjust_na_pitches_start_p_df(p_df)
             else:
                 p_df["pitches_start"] = self.opp_instance.custom_pps
+            
+            
+                    
+            
 
             key = "pitches_pa_" + self.o_split
-            h_df.loc[lefties, 'pitches_pa_sp'] = ((h_df[key] * settings.H_PIT_PER_BAT_WEIGHT) + (p_df['ppb_vl'].max() * settings.P_PIT_PER_BAT_WEIGHT))
+            series = h_df[key]
+            h_df = Team.set_pit_per_pa_h_df(series, h_df, p_df, lefties, righties)
+            
             pitches_ab_array = h_df[key].to_numpy()
             pitches = p_df['pitches_start'].item()
             idx = 0
@@ -952,7 +981,7 @@ class Team(metaclass=IterTeam):
                     idx = 0
             p_df["exp_x_lu"] = total_batters_faced / settings.LU_LENGTH
             
-            # p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() * settings.H_PIT_PER_BAT_WEIGHT) + (p_ppb * settings.P_PIT_PER_BAT_WEIGHT))
+            # p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() * settings.H_PIT_PER_AB_WGT) + (p_ppb * settings.P_PIT_PER_AB_WGT))
             h_df["sp_exp_x_lu"] = p_df["exp_x_lu"].max()
             
             print(
@@ -1794,6 +1823,18 @@ class Team(metaclass=IterTeam):
                 pickle_dump(game, file)
                 print(f"Cached {self.name}' next game.")
         return None
+
+    def clear_team_cache(self, directories=settings.VITAL_DIR_LIST):
+        for d in directories:
+            for file in Path.iterdir(d):
+                if not file.is_dir() and self.name in str(file):
+                    file.unlink()
+        return f"Cleared cache for {self.name}."
+
+    def clear_all_team_cache(self):
+        self.clear_team_cache(directories=settings.VITAL_DIR_LIST)
+        return f"Cleared vital directories for {self.name}."
+
 if __name__ == "__main__":
     angels = Team(mlb_id = 108, name = 'angels')
     astros = Team(mlb_id = 117, name = 'astros')
