@@ -72,11 +72,7 @@ class Team(metaclass=IterTeam):
 
     @staticmethod
     def roster_dict(instance, roster_type, is_depth=False):
-        hydrate = settings.api_hydrate["p_info"]
-        call = statsapi.get(
-            "team_roster",
-            {"teamId": instance.id, "rosterType": roster_type, "hydrate": hydrate},
-        )["roster"]
+        call = Team.get_roster_api(instance.id, roster_type)
         if not is_depth:
             info = []
             for p in call:
@@ -114,9 +110,9 @@ class Team(metaclass=IterTeam):
         """
         """
         if hitters:
-            return df1.join(h_splits.set_index(column), on=col, rsuffix='_drop')
+            return df1.join(h_splits.set_index(col), on=col, rsuffix='_drop')
         else:
-            return df1.join(p_splits.set_index(column), on=col, rsuffix='_drop')
+            return df1.join(p_splits.set_index(col), on=col, rsuffix='_drop')
     
     @staticmethod
     def get_player_api(player_id):
@@ -125,6 +121,15 @@ class Team(metaclass=IterTeam):
     @staticmethod
     def get_game_api(game_id):
         return statsapi.get("game", {"gamePk": game_id})
+
+    @staticmethod
+    def get_roster_api(teamid, roster_type):
+        hydrate = settings.api_hydrate["p_info"]
+        call = statsapi.get(
+            "team_roster",
+            {"teamId": teamid, "rosterType": roster_type, "hydrate": hydrate},
+                          )["roster"]
+        return call
 
     @staticmethod
     def dump_json_data(file, json_data):
@@ -212,13 +217,13 @@ class Team(metaclass=IterTeam):
         l_filt = Team.get_split_filter(df, "L", pitchers=True)
         r_filt = Team.get_split_filter(df, "R", pitchers=True)
         if not bullpen:
-            min_bf = MIN_BF_SP
+            min_bf = settings.MIN_BF_SP
             min_bf_sp = settings.MIN_BF_SP_SPLIT
             stats = settings.STATS_TO_ADJUST_SP
             p_col = "_sp"
             a_dfs_branch = a_dfs["P"]["SP"]
         else:
-            min_bf = MIN_BF_BP
+            min_bf = settings.MIN_BF_BP
             min_bf_sp = setting.MIN_BF_BP_SPLIT
             stats = settings.STATS_TO_ADJUST_RP
             p_col = "_rp"
@@ -276,6 +281,14 @@ class Team(metaclass=IterTeam):
     @staticmethod
     def get_game_officials(game):
         return game["liveData"]["boxscore"]["officials"]
+
+    @staticmethod
+    def get_game_pk(game):
+        return game["games"][0]["gamePk"]
+    
+    @staticmethod
+    def get_game_plays(game):
+        return game["liveData"]["plays"]["allPlays"]
 
     @staticmethod
     def get_official_id(official):
@@ -433,7 +446,6 @@ class Team(metaclass=IterTeam):
         pitchers = self.starter.combine_first(self.bullpen)
         return pitchers
 
-
     @cached_property
     def coaches(self):
         ## TODO functin to get coaches, coach dict in mlb_static.py
@@ -479,6 +491,7 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def all_games(self):
+        
         file = pickle_path(
             name=f"{self.name}_schedule_{tf.today}", directory=settings.SCHED_DIR
         )
@@ -486,20 +499,13 @@ class Team(metaclass=IterTeam):
         if path.exists():
             schedule = pd.read_pickle(path)
         else:
-            schedule = full_schedule(team=self.id, start_date=cs.spring_start, end_date=cs.playoff_end)
+            schedule = full_schedule(
+                                     team=self.id, 
+                                     start_date=cs.spring_start, 
+                                     end_date=cs.playoff_end
+                                     )
             pickle_dump(schedule, file)
         return schedule
-
-    def clear_team_cache(self, directories=settings.VITAL_DIR_LIST):
-        for d in directories:
-            for file in Path.iterdir(d):
-                if not file.is_dir() and self.name in str(file):
-                    file.unlink()
-        return f"Cleared cache for {self.name}."
-
-    def clear_all_team_cache(self):
-        self.clear_team_cache(directories=settings.VITAL_DIR_LIST)
-        return f"Cleared vital directories for {self.name}."
 
     @cached_property
     def future_games(self):
@@ -546,21 +552,18 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def last_game(self):
-
-        file = pickle_path(
-            name=f"{self.name}_last_game_{tf.today}", directory=settings.GAME_DIR
-        )
-        path = settings.GAME_DIR.joinpath(file)
-        if path.exists():
-            game = pd.read_pickle(path)
-            return game
-
-            # if not game['gameData']['game']['doubleHeader'] == 'Y' and game['gameData']['gameNumber'] == 1:
-            #     return game
         if self.last_game_pk:
-            print(f"Getting boxscore {self.name.capitalize()}' last game.")
-            game = Team.get_game_api(self.last_game_pk)
-            pickle_dump(game, file)
+            file = pickle_path(
+                name=f"{self.name}_last_game_{tf.today}", directory=settings.GAME_DIR
+            )
+            path = settings.GAME_DIR.joinpath(file)
+            if path.exists():
+                game = pd.read_pickle(path)
+            else:
+                # if not game['gameData']['game']['doubleHeader'] == 'Y' ???
+                print(f"Getting boxscore {self.name.capitalize()}' last game.")
+                game = Team.get_game_api(self.last_game_pk)
+                pickle_dump(game, file)
             return game
         return self.last_game_pk
 
@@ -622,9 +625,7 @@ class Team(metaclass=IterTeam):
         sp_id = self.probable_pitcher_id_string(home_or_away)
         return self.next_game["gameData"]["players"][sp_id]
 
-    @staticmethod
-    def check_confirmed_sp(current_daily_info, teamname):
-        return teamname in current_daily_info["confirmed_sp"]
+    
 
     @cached_property
     def opp_sp(self):
@@ -752,40 +753,36 @@ class Team(metaclass=IterTeam):
                 if self.name not in daily_info["confirmed_lu"]:
                     daily_info["confirmed_lu"].append(self.name)
                     Team.dump_json_data(settings.daily_info_file, daily_info)
-
                 self.cache_next_game()
                 return lineup
             else:
                 return self.projected_lineup
         return self.next_game_pk
 
+    
+
     @cached_property
     def projected_lineup(self):
         print(f"Getting projected lineup for {self.name}")
         team_lineups = Team.lineups()
         try:
-            #i do this because 
             if len(team_lineups[self.name][self.opp_sp_hand]) == 9:
                 return team_lineups[self.name][self.opp_sp_hand]
             else:
                 lineup = []
-                plays = self.last_game["liveData"]["plays"]["allPlays"]
+                plays = Team.get_game_plays(self.last_game)
                 if self.was_home:
-                    h = False
+                    top_inning = False
                 else:
-                    h = True
+                    top_inning = True
                 for play in plays:
-                    if play["about"]["isTopInning"] == h:
+                    if play["about"]["isTopInning"] == top_inning:
                         lineup.append(play["matchup"]["batter"]["id"])
                         if len(lineup) == 9:
-                            break
-                self.update_lineup(lineup, self.last_opp_sp_hand)
-                return lineup
+                            self.update_lineup(lineup, self.last_opp_sp_hand)
+                            return lineup
         except (KeyError, TypeError):
-            return (
-                self.last_game_pk
-                + "projected lineup will be available after first spring training game."
-            )
+            return self.last_game_pk
 
     def update_lineup(self, lineup, hand):
         team_lineups = Team.lineups()
@@ -843,13 +840,20 @@ class Team(metaclass=IterTeam):
                     hitters = hitters[~hitters["mlb_id"].isin(excluded)]
                     return hitters.loc[hitters[h_key].idxmax()]
 
-    def lineup_df(self):
-        file = pickle_path(
-            name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR
-        )
-        path = settings.LINEUP_DIR.joinpath(file)
-        daily_info = Team.daily_info()
-        def calculate_team_lu_points(self, lineup_df):
+    @staticmethod
+    def check_confirmed_lineup(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_lu"]
+
+    @staticmethod
+    def check_confirmed_sp(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_sp"]
+
+    def should_reset_lineup(self):
+        if settings.reset_all_lineups:
+            return True
+        return (self.name in settings.reset_specific_lineups and not self.ppd)
+    
+    def calculate_team_lu_points(self, lineup_df):
             self.raw_points = lineup_df["exp_ps_raw"].sum()
             self.venue_points = lineup_df["venue_points"].sum()
             self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
@@ -860,72 +864,111 @@ class Team(metaclass=IterTeam):
             self.sp_mu = lineup_df["sp_mu"].sum()
             self.lu_talent_sp = lineup_df["sp_split"].sum() - lineup_df["sp_split"].std(ddof=0)
             return lineup_df
-        if not self.ppd and (self.name not in daily_info["confirmed_lu"] or self.name in settings.reset_specific_lineups or settings.reset_all_lineups):
+    
+    @staticmethod
+    def add_missing_players_h_df(h_df, ids):
+        for i_d in [i_d for i_d in ids if i_d not in h_df["mlb_id"].values]:
+            player = Team.get_player_api(i_d)
+            position = player["primaryPosition"]["code"]
+            position_type = player["primaryPosition"]["type"]
+            new_row = self.get_replacement(position, position_type, ids)
+            idx = ids.index(i_d)
+            ids[idx] = int(new_row["mlb_id"])
+            h_df = h_df.append(new_row, ignore_index=True)
+        return h_df
+    @staticmethod
+    def set_order_h_df(h_df, ids):
+        sorter = dict(zip(ids, range(len(ids))))
+        h_df["order"] = h_df["mlb_id"].map(sorter)
+        h_df.sort_values(by="order", inplace=True, kind="mergesort")
+        h_df["order"] = h_df["order"] + 1
+        h_df.reset_index(inplace=True, drop=True)
+        return h_df
+
+    @staticmethod
+    def set_switch_hand_h_df(h_df, hand):
+        if hand == "R":
+            h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "L"
+        else:
+            h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "R"
+        return h_df
+
+    ## TODO reference the series' origin
+    @staticmethod
+    def set_pit_per_pa_h_df(h_df_series, h_df, p_df, lefties, righties):
+        splits = {"_vl": lefties, "_vr": righties}
+        h_weight = (h_df_series * settings.H_PIT_PER_AB_WGT)
+        for col, filt in splits.items():
+            p_weight = (p_df["ppb" + col].max() * settings.P_PIT_PER_AB_WGT)
+            h_df.loc[filt, 'pitches_pa_sp'] = (h_weight + p_weight)
+        return h_df
+
+    @cached_property
+    def opp_sp_df(self):
+        try:
+            p_info = self.opp_sp
+            pitcher = api_pitcher_info_dict(p_info)
+            pitcher["team"] = self.opp_name
+            p_df = Team.join_player_stats(pd.DataFrame([pitcher]), hitters=False)
+        except TypeError:
+            p_df = Team.default_sp()
+        return p_df
+
+    @staticmethod
+    def pitches_per_order(h_df, p_df):
+        l_weight = Team.get_split_filter(h_df, "L", return_percentage=True)
+        r_weight = Team.get_split_filter(h_df, "R", return_percentage=True)
+        pitches_per_lhb = (l_weight * p_df["ppb_vl"].max())
+        pitches_per_rhb = (r_weight * p_df["ppb_vr"].max())
+        return ((pitches_per_lhb + pitches_per_rhb)) * settings.LU_LENGTH
+
+    @staticmethod
+    def adjust_na_pitches_start_p_df(p_df):
+        adjustment_df = a_dfs["P"]["SP"]["RAW"]["raw"]["pitches_start"]
+        p_df["pitches_start"].fillna(adjustment_df.median(), inplace=True)
+        return p_df
+
+    def lineup_df(self):
+        file = pickle_path(
+            name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR
+        )
+        daily_info = Team.daily_info()
+        confirmed = Team.check_confirmed_lineup(daily_info, self.name)
+        reset_flag = self.should_reset_lineup())
+        path = settings.LINEUP_DIR.joinpath(file)
+        if (not confirmed or reset_flag):
             self.del_props()
-        if not path.exists() or self.name not in daily_info["confirmed_lu"] or self.name in settings.reset_specific_lineups or settings.reset_all_lineups:
+        if not path.exists() or (not confirmed or reset_flag):
             lineup_ids = self.lineup
             lineup = pd.DataFrame(lineup_ids, columns=["mlb_id"])
             roster = pd.DataFrame(self.full_roster)
-            merged = pd.merge(lineup, roster, on="mlb_id")
-            h_df = Team.join_player_stats(merged)
-            roster = Team.join_player_stats(roster)
-            if not self.custom_lineup:
-                if len(h_df.index) < 9:
-                    for i_d in lineup_ids:
-                        if i_d not in h_df["mlb_id"].values:
-                            new_row = roster[roster["mlb_id"] == i_d]
-                            if len(new_row.index) == 0:
-                                player = Team.get_player_api(i_d)
-                                position = player["primaryPosition"]["code"]
-                                position_type = player["primaryPosition"]["type"]
-                                new_row = self.get_replacement(
-                                    position, position_type, lineup_ids
-                                )
-                                index = lineup_ids.index(i_d)
-                                lineup_ids[index] = int(new_row["mlb_id"])
-                                self.update_lineup(lineup_ids, self.opp_sp_hand)
-                            h_df = h_df.append(new_row, ignore_index=True)
-            sorter = dict(zip(lineup_ids, range(len(lineup_ids))))
-            # new
+            h_df = Team.join_player_stats(pd.merge(lineup, roster, on="mlb_id"))
+            if not self.custom_lineup and len(h_df.index) < 9:
+                h_df = Team.add_missing_players_h_df(h_df, lineup_ids)
             h_df = h_df.loc[~h_df.duplicated(subset=["mlb_id"])]
-            h_df["order"] = h_df["mlb_id"].map(sorter)
-            h_df.sort_values(by="order", inplace=True, kind="mergesort")
-            h_df["order"] = h_df["order"] + 1
-            h_df.reset_index(inplace=True, drop=True)
-            if self.opp_sp_hand == "R":
-                h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "L"
-            else:
-                h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "R"
-
+            assert len(h_df.index) == 9, f"{self.name}' has {len(hf.index)} players."
+            h_df = Team.set_order_h_df(h_df, lineup_ids)
+            h_df = Team.set_switch_hand_h_df(h_df, self.opp_sp_hand)
             h_df = Team.adjust_non_qualified_h(h_df)
-
-            try:
-                p_info = self.opp_sp
-                player = api_pitcher_info_dict(p_info)
-                player["team"] = self.opp_name
-                Team.join_player_stats(pd.DataFrame([player]), hitters=False)
-            except TypeError:
-                p_df = Team.default_sp()
-
+            p_df = self.opp_sp_df
             lefties = Team.get_split_filter(h_df, "L")
             righties = Team.get_split_filter(h_df, "R")
-            l_weight = Team.get_split_filter(h_df, "L", return_percentage=True)
-            r_weight = Team.get_split_filter(h_df, "R", return_percentage=True)
             p_df = Team.adjust_non_qualified_p(p_df)
-            p_ppb = (
-                (l_weight * p_df["ppb_vl"].max()) + (r_weight * p_df["ppb_vr"].max())
-            ) * settings.LU_LENGTH
+            # p_ppb = Team.pitches_per_order(h_df, p_df)
 
             if not self.opp_instance.custom_pps:
-                p_df["pitches_start"].fillna(
-                    a_dfs["P"]["SP"]["RAW"]["raw"]["pitches_start"].median(),
-                    inplace=True,
-                )
+                p_df = Team.adjust_na_pitches_start_p_df(p_df)
             else:
                 p_df["pitches_start"] = self.opp_instance.custom_pps
+            
+            
+                    
+            
 
             key = "pitches_pa_" + self.o_split
-            h_df.loc[lefties, 'pitches_pa_sp'] = ((h_df[key] * settings.H_PIT_PER_BAT_WEIGHT) + (p_df['ppb_vl'].max() * settings.P_PIT_PER_BAT_WEIGHT))
+            series = h_df[key]
+            h_df = Team.set_pit_per_pa_h_df(series, h_df, p_df, lefties, righties)
+            
             pitches_ab_array = h_df[key].to_numpy()
             pitches = p_df['pitches_start'].item()
             idx = 0
@@ -938,7 +981,7 @@ class Team(metaclass=IterTeam):
                     idx = 0
             p_df["exp_x_lu"] = total_batters_faced / settings.LU_LENGTH
             
-            # p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() * settings.H_PIT_PER_BAT_WEIGHT) + (p_ppb * settings.P_PIT_PER_BAT_WEIGHT))
+            # p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() * settings.H_PIT_PER_AB_WGT) + (p_ppb * settings.P_PIT_PER_AB_WGT))
             h_df["sp_exp_x_lu"] = p_df["exp_x_lu"].max()
             
             print(
@@ -1448,152 +1491,121 @@ class Team(metaclass=IterTeam):
         # return self.last_game['gameData']['teams']['home']['league']['id'] == 103
 
     @cached_property
-    def next_venue_boost(self):
+    def qualified_venues(self):
+        return qualified_venue_stats(exclude=[self.next_venue])
+    
+    @cached_property
+    def wind_out(self):
+        return self.wind_direction in mac.weather.wind_out
+    
+    @cached_property
+    def wind_in(self):
+        return self.wind_direction in mac.weather.wind_in
+
+    @cached_property
+    def boost_data(self):
         if self.next_game_pk:
             data = self.next_venue_data
         else:
             data = self.home_venue_data
-        q_venues = qualified_venue_stats(
-            venue_data, exclude=[self.next_venue], series_or_columns=None
-        )
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
-            wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points"].mean() - wind_in["fd_points"].mean())
-                    / game_data["fd_points"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 1):
-                        if self.wind_direction in mac.weather.wind_out:
-                            data = wind_out
-                        if self.wind_direction in mac.weather.wind_in:
-                            data = wind_in
+        return data
+
+    @cached_property
+    def wind_data(self):
+        data = self.boost_data
+        wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
+        wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
+        return wind_in, wind_out
+
+    @cached_property
+    def wind_in_data(self):
+        return self.wind_data[0]
+    
+    @cached_property
+    def wind_out_data(self):
+        return self.wind_out_data[1]
+
+    @cached_property
+    def wind_in_or_out(self):
+        if (settings.wind_factor and not self.roof_closed):
+            return (self.wind_in or self.wind_out)
+        return False
+
+    @cached_property
+    def sufficient_wind_data(self):
+        sufficient = settings.MIN_GAMES_VENUE_WIND
+        in_sufficient = len(self.wind_in_data.index) >= sufficient
+        out_sufficient = len(self.wind_out_data.index) >= sufficient
+        return all(in_sufficient, out_sufficient)
+
+    @cached_property
+    def logical_wind_data(self):
+        wind_in_mean = self.wind_in_data["fd_points"].mean()
+        wind_out_mean = self.wind_out_data["fd_points"].mean()
+        return (wind_in_mean < wind_out_mean)
+
+    @cached_property
+    def sufficient_wind_speed(self):
+        return (self.wind_speed >= (game_data["wind_speed"].median() - 1))
+
+    @cached_property
+    def wind_factor(self):
+        is_factor = all(
+                        self.wind_in_or_out,
+                        self.sufficient_wind_data,
+                        self.logical_wind_data,
+                        self.sufficient_wind_speed
+                        )
+        return is_factor
+
+    @cached_property
+    def next_venue_boost_data(self):
+        data = self.boost_data
+        
+        if self.wind_factor:
+            if self.wind_out:
+                data = self.wind_out_data
+            elif self.wind_in:
+                data = self.wind_in_data
+        return data
+
+    @cached_property
+    def next_venue_boost(self):
+        data = self.next_venue_boost_data
+        q_venues = self.qualified_venues
         pts_pa_next_venue = data["fd_points"].sum() / data["adj_pa"].sum()
         pts_pa_q_venues = q_venues["fd_pts_pa"].mean()
-        return pts_pa_next_venue / pts_pa_q_venues
-
-    @cached_property
-    def next_venue_boost_lhb(self):
-        if self.next_game_pk:
-            data = self.next_venue_data
-        else:
-            data = self.home_venue_data
-
-        q_venues = qualified_venue_stats(
-            venue_data, exclude=[self.next_venue], series_or_columns=None
-        )
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
-            wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points_lhb"].mean() - wind_in["fd_points_lhb"].mean())
-                    / game_data["fd_points_lhb"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 0.5):
-                        if self.wind_direction in mac.weather.wind_out:
-                            data = wind_out
-                        if self.wind_direction in mac.weather.wind_in:
-                            data = wind_in
         lhb_pts_pa_next_venue = data["fd_points_lhb"].sum() / data["adj_pa_lhb"].sum()
         lhb_pts_pa_q_venues = q_venues["fd_pts_pa_lhb"].mean()
-        return lhb_pts_pa_next_venue / lhb_pts_pa_q_venues
-
-    @cached_property
-    def next_venue_boost_rhb(self):
-        if self.next_game_pk:
-            data = self.next_venue_data
-        else:
-            data = self.home_venue_data
-
-        q_venues = qualified_venue_stats(
-            venue_data, exclude=[self.next_venue], series_or_columns=None
-        )
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = data[data["wind_direction"].isin(mac.weather.wind_in)]
-            wind_out = data[data["wind_direction"].isin(mac.weather.wind_out)]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points_rhb"].mean() - wind_in["fd_points_rhb"].mean())
-                    / game_data["fd_points_rhb"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 0.5):
-                        if self.wind_direction in mac.weather.wind_out:
-                            data = wind_out
-                        if self.wind_direction in mac.weather.wind_in:
-                            data = wind_in
         rhb_pts_pa_next_venue = data["fd_points_rhb"].sum() / data["adj_pa_rhb"].sum()
         rhb_pts_pa_q_venues = q_venues["fd_pts_pa_rhb"].mean()
-        return rhb_pts_pa_next_venue / rhb_pts_pa_q_venues
+        self.next_venue_boost_lhb = lhb_pts_pa_next_venue / lhb_pts_pa_q_venues
+        self.next_venue_boost_rhb = rhb_pts_pa_next_venue / rhb_pts_pa_q_venues
+        return pts_pa_next_venue / pts_pa_q_venues
+
+    # @cached_property
+    # def next_venue_boost_lhb(self):
+    #     q_venues = self.qualified_venues
+    #     data = self.next_venue_boost_data
+    #     lhb_pts_pa_next_venue = data["fd_points_lhb"].sum() / data["adj_pa_lhb"].sum()
+    #     lhb_pts_pa_q_venues = q_venues["fd_pts_pa_lhb"].mean()
+    #     return lhb_pts_pa_next_venue / lhb_pts_pa_q_venues
+
+    # @cached_property
+    # def next_venue_boost_rhb(self):
+    #     q_venues = self.qualified_venues
+    #     data = self.next_venue_boost_data
+    #     rhb_pts_pa_next_venue = data["fd_points_rhb"].sum() / data["adj_pa_rhb"].sum()
+    #     rhb_pts_pa_q_venues = q_venues["fd_pts_pa_rhb"].mean()
+    #     return rhb_pts_pa_next_venue / rhb_pts_pa_q_venues
 
     @cached_property
     def venue_avg(self):
-        # rangers ballpark skewed
-        if self.next_venue == 5325:
-            if not self.roof_closed:
-                return game_data["fd_points"].mean() * 1
-            else:
-                return game_data["fd_points"].mean() * 1
-
-        if (
-            settings.wind_factor
-            and (
-                self.wind_direction in mac.weather.wind_out
-                or self.wind_direction in mac.weather.wind_in
-            )
-            and not self.roof_closed
-        ):
-            wind_in = self.next_venue_data[
-                self.next_venue_data["wind_direction"].isin(mac.weather.wind_in)
-            ]
-            wind_out = self.next_venue_data[
-                self.next_vendef ue_data["wind_direction"].isin(mac.weather.wind_out)
-            ]
-            if (
-                len(wind_in.index) >= settings.MIN_GAMES_VENUE_WIND
-                and len(wind_out.index) >= settings.MIN_GAMES_VENUE_WIND
-            ):
-                if (
-                    (wind_out["fd_points"].mean() - wind_in["fd_points"].mean())
-                    / game_data["fd_points"].mean()
-                ) > 0:
-                    if self.wind_speed >= (game_data["wind_speed"].median() - 1):
-                        if self.wind_direction in mac.weather.wind_out:
-                            return wind_out["fd_points"].mean()
-                        if self.wind_direction in mac.weather.wind_in:
-                            return wind_in["fd_points"].mean()
-
+        if self.wind_factor:
+            if self.wind_out:
+                return self.wind_out_data["fd_points"].mean()
+            if self.wind_in:
+                return self.wind_in_data["fd_points"].mean()
         return self.next_venue_data["fd_points"].mean()
     
     @cached_property
@@ -1643,7 +1655,10 @@ class Team(metaclass=IterTeam):
         if self.roof_closed:
             sample = game_data[game_data["condition"].isin(mac.weather.roof_closed)]
             temp = sample["fd_points"].mean()
-        return ((temp * settings.ENV_TEMP_WEIGHT) + (venue * settings.ENV_VENUE_WEIGHT) + (ump * settings.ENV_UMP_WEIGHT))
+        return ((temp * settings.ENV_TEMP_WEIGHT) + 
+                (venue * settings.ENV_VENUE_WEIGHT) + 
+                (ump * settings.ENV_UMP_WEIGHT))
+
     def sp_avg(self, return_full_dict=False):
         away = game_data[(game_data["away_sp"] == self.opp_sp["id"])]
         home = game_data[(game_data["home_sp"] == self.opp_sp["id"])]
@@ -1737,17 +1752,19 @@ class Team(metaclass=IterTeam):
         for team in Team:
             if team.name == self.opp_name:
                 return team
+              
+    def get_past_games(self, number_of_games):
+        return self.past_games[-number_of_games:]
 
     def rested_sp(self, return_used_ids=False):
         if self.last_game_pk:
             try:
-                games = self.past_games[-4:]
+                games = self.get_past_games(4)
             except IndexError:
                 games = self.past_games
             game_ids = []
             for game in games:
-
-                game_ids.append(game["games"][0]["gamePk"])
+                game_ids.append(Team.get_game_pk(game))
             game_ids = ids_string(game_ids)
             call = statsapi.get(
                 "schedule",
@@ -1806,6 +1823,18 @@ class Team(metaclass=IterTeam):
                 pickle_dump(game, file)
                 print(f"Cached {self.name}' next game.")
         return None
+
+    def clear_team_cache(self, directories=settings.VITAL_DIR_LIST):
+        for d in directories:
+            for file in Path.iterdir(d):
+                if not file.is_dir() and self.name in str(file):
+                    file.unlink()
+        return f"Cleared cache for {self.name}."
+
+    def clear_all_team_cache(self):
+        self.clear_team_cache(directories=settings.VITAL_DIR_LIST)
+        return f"Cleared vital directories for {self.name}."
+
 if __name__ == "__main__":
     angels = Team(mlb_id = 108, name = 'angels')
     astros = Team(mlb_id = 117, name = 'astros')
