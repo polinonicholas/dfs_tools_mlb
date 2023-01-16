@@ -4,14 +4,13 @@ import pandas as pd
 import json
 from json import JSONDecodeError
 import numpy as np
-import pickle
 import datetime
 from math import floor, ceil
 from pathlib import Path
 
 import statsapi
 
-from dfs_tools_mlb.compile import current_season as cs, cs_yr
+from dfs_tools_mlb.compile import current_season as cs
 from dfs_tools_mlb.compile.static_mlb import mlb_api_codes as mac
 from dfs_tools_mlb.compile.static_mlb import api_player_info_dict, api_pitcher_info_dict
 from dfs_tools_mlb.utils.statsapi import full_schedule
@@ -35,6 +34,7 @@ class IterTeam(type):
 
 class Team(metaclass=IterTeam):
     _all_teams = []
+    avg_fanduel_points_game = game_data["fd_points"].mean()
 
     def __init__(
         self,
@@ -121,6 +121,24 @@ class Team(metaclass=IterTeam):
     @staticmethod
     def get_game_api(game_id):
         return statsapi.get("game", {"gamePk": game_id})
+    
+    @staticmethod
+    def get_probable_pitchers_past_games(game_ids_string):
+        """
+        game_ids_string e.g.: "663419,662431,662429,662421"
+        """
+        sp_key = "probablePitcher"
+        params = {"gamePks": game_ids_string, "sportId": 1, "hydrate": sp_key}
+        games  = statsapi.get("schedule", params)["dates"]
+        recent_sp = set()
+        for game in games:
+            team_branch = game["games"][0]["teams"]
+            id_key = "id"
+            home_sp = team_branch["home"].get(sp_key, {}).get(id_key)
+            away_sp = team_branch["away"].get(sp_key, {}).get(id_key)
+            recent_sp.add(home_sp)
+            recent_sp.add(away_sp)
+        return recent_sp
 
     @staticmethod
     def get_roster_api(teamid, roster_type):
@@ -247,6 +265,7 @@ class Team(metaclass=IterTeam):
 
         return df
 
+    @staticmethod
     def adjust_non_qualified_h(df, base="pa"):
 
         l_filt = Team.get_split_filter(df, "L")
@@ -291,6 +310,10 @@ class Team(metaclass=IterTeam):
         return game["liveData"]["plays"]["allPlays"]
 
     @staticmethod
+    def get_game_team_id(game, home_or_away="home"):
+        return int(game["gameData"]["teams"][home_or_away]["id"])
+
+    @staticmethod
     def get_official_id(official):
         return official["official"]["id"]
 
@@ -305,6 +328,14 @@ class Team(metaclass=IterTeam):
                 return ump
         except StopIteration:
             return "Unable to project ump."
+    
+    @staticmethod
+    def check_confirmed_lu(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_lu"]
+
+    @staticmethod
+    def check_confirmed_sp(current_daily_info, teamname):
+        return teamname in current_daily_info["confirmed_sp"]
         
     @cached_property
     def depth(self):
@@ -361,7 +392,6 @@ class Team(metaclass=IterTeam):
         if active_players_only:
             batters = batters[batters['status'] == 'A']
         return Team.join_player_stats(batters)
-
 
     @cached_property
     def hitter(self):
@@ -495,16 +525,20 @@ class Team(metaclass=IterTeam):
         file = pickle_path(
             name=f"{self.name}_schedule_{tf.today}", directory=settings.SCHED_DIR
         )
+        
         path = settings.SCHED_DIR.joinpath(file)
         if path.exists():
             schedule = pd.read_pickle(path)
+            
         else:
             schedule = full_schedule(
                                      team=self.id, 
                                      start_date=cs.spring_start, 
                                      end_date=cs.playoff_end
                                      )
+            
             pickle_dump(schedule, file)
+            
         return schedule
 
     @cached_property
@@ -562,6 +596,7 @@ class Team(metaclass=IterTeam):
             else:
                 # if not game['gameData']['game']['doubleHeader'] == 'Y' ???
                 print(f"Getting boxscore {self.name.capitalize()}' last game.")
+                ## TODO use self.past_games like self.last_game_pk does
                 game = Team.get_game_api(self.last_game_pk)
                 pickle_dump(game, file)
             return game
@@ -570,13 +605,13 @@ class Team(metaclass=IterTeam):
     @cached_property
     def is_home(self):
         if self.next_game_pk:
-            return int(self.next_game["gameData"]["teams"]["home"]["id"]) == self.id
+            return  Team.get_game_team_id(self.next_game) == self.id
         return self.next_game_pk
 
     @cached_property
     def was_home(self):
         if self.last_game_pk:
-            return int(self.last_game["gameData"]["teams"]["home"]["id"]) == self.id
+            return Team.get_game_team_id(self.last_game) == self.id
         return self.last_game_pk
 
     @cached_property
@@ -619,13 +654,11 @@ class Team(metaclass=IterTeam):
         return self.next_game["gameData"]["probablePitchers"]
 
     def probable_pitcher_id_string(self, home_or_away):
-        return "ID" + str(self.next_game_probable_pitchers()[self.opp_ha]["id"])
+        return "ID" + str(self.next_game_probable_pitchers()[home_or_away]["id"])
     
     def probable_pitcher_info(self, home_or_away):
         sp_id = self.probable_pitcher_id_string(home_or_away)
         return self.next_game["gameData"]["players"][sp_id]
-
-    
 
     @cached_property
     def opp_sp(self):
@@ -638,6 +671,7 @@ class Team(metaclass=IterTeam):
                 self.del_next_game()
             try:
                 #KeyError would be raised on opp_sp_info, if no listed pitcher
+                #a listed pitcher is considered confirmed
                 sp_info = self.probable_pitcher_info(self.opp_ha)
                 if not opp_sp_confirmed:
                     Team.update_daily_info(daily_info, "confirmed_sp", self.opp_name)
@@ -671,8 +705,9 @@ class Team(metaclass=IterTeam):
                 self.del_next_game()
             try:
                 #KeyError would be here
+                #if no KeyError, the pitcher is considered confirmed
                 sp_info = self.probable_pitcher_info(self.ha)
-                if sp_confirmed:
+                if not sp_confirmed:
                     Team.update_daily_info(daily_info, "confirmed_sp", self.name)
                 self.cache_next_game()
                 return sp_info
@@ -733,33 +768,46 @@ class Team(metaclass=IterTeam):
             return name
         return self.next_game_pk
 
+
+    @staticmethod
+    def get_game_batting_order(game, home_or_away = "home"):
+        branch = game["liveData"]["boxscore"]["teams"]
+        if home_or_away:
+            batting_order = branch[home_or_away]["battingOrder"]
+        else:
+            home = branch["home"]["battingOrder"]
+            away = branch["away"]["battingOrder"]
+
+            batting_order = {
+                "home": home,
+                "away": away,
+            }
+        return batting_order
+
     @cached_property
     def lineup(self):
         if self.custom_lineup:
             return self.custom_lineup
-        if self.next_game_pk:
-            daily_info = Team.daily_info()
-            if self.name in daily_info["confirmed_lu"]:
-                lineup = Team.lineups()[self.name][self.opp_sp_hand]
-                if len(lineup) == 9:
-                    return lineup
-            if self.name not in daily_info["confirmed_lu"] and not self.ppd:
-                self.del_next_game()
-            lineup = self.next_game["liveData"]["boxscore"]["teams"][self.ha][
-                "battingOrder"
-            ]
-            if len(lineup) == 9:
+        elif not self.next_game_pk:
+            return self.next_game_pk
+        elif self.ppd:
+            return Team.lineups()[self.name][self.opp_sp_hand]
+        daily_info = Team.daily_info()
+        lineup_confirmed = Team.check_confirmed_lu(daily_info, self.name)
+        if lineup_confirmed:
+            lineup = Team.lineups()[self.name][self.opp_sp_hand]
+        else:
+            self.del_next_game()
+            game = self.next_game
+            lineup = Team.get_game_batting_order(game, home_or_away = self.ha)
+            if len(set(lineup)) == 9:
                 self.update_lineup(lineup, self.opp_sp_hand)
-                if self.name not in daily_info["confirmed_lu"]:
-                    daily_info["confirmed_lu"].append(self.name)
-                    Team.dump_json_data(settings.daily_info_file, daily_info)
-                self.cache_next_game()
-                return lineup
+                daily_info["confirmed_lu"].append(self.name)
+                Team.dump_json_data(settings.daily_info_file, daily_info)
+                self.cache_next_game() 
             else:
                 return self.projected_lineup
-        return self.next_game_pk
-
-    
+        return lineup
 
     @cached_property
     def projected_lineup(self):
@@ -778,7 +826,7 @@ class Team(metaclass=IterTeam):
                 for play in plays:
                     if play["about"]["isTopInning"] == top_inning:
                         lineup.append(play["matchup"]["batter"]["id"])
-                        if len(lineup) == 9:
+                        if len(set(lineup)) == 9:
                             self.update_lineup(lineup, self.last_opp_sp_hand)
                             return lineup
         except (KeyError, TypeError):
@@ -840,13 +888,6 @@ class Team(metaclass=IterTeam):
                     hitters = hitters[~hitters["mlb_id"].isin(excluded)]
                     return hitters.loc[hitters[h_key].idxmax()]
 
-    @staticmethod
-    def check_confirmed_lineup(current_daily_info, teamname):
-        return teamname in current_daily_info["confirmed_lu"]
-
-    @staticmethod
-    def check_confirmed_sp(current_daily_info, teamname):
-        return teamname in current_daily_info["confirmed_sp"]
 
     def should_reset_lineup(self):
         if settings.reset_all_lineups:
@@ -854,19 +895,19 @@ class Team(metaclass=IterTeam):
         return (self.name in settings.reset_specific_lineups and not self.ppd)
     
     def calculate_team_lu_points(self, lineup_df):
-            self.raw_points = lineup_df["exp_ps_raw"].sum()
-            self.venue_points = lineup_df["venue_points"].sum()
-            self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
-            self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
-            self.points = (
-                self.venue_points + self.temp_points + self.ump_points + self.raw_points
-            )
-            self.sp_mu = lineup_df["sp_mu"].sum()
-            self.lu_talent_sp = lineup_df["sp_split"].sum() - lineup_df["sp_split"].std(ddof=0)
-            return lineup_df
+
+        self.raw_points = lineup_df["exp_ps_raw"].sum()
+        self.venue_points = lineup_df["venue_points"].sum()
+        self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
+        self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
+        self.points = (
+            self.venue_points + self.temp_points + self.ump_points + self.raw_points
+        )
+        self.sp_mu = lineup_df["sp_mu"].sum()
+        self.lu_talent_sp = lineup_df["sp_split"].sum() - lineup_df["sp_split"].std(ddof=0)
+        return lineup_df
     
-    @staticmethod
-    def add_missing_players_h_df(h_df, ids):
+    def add_missing_players_h_df(self, h_df, ids):
         for i_d in [i_d for i_d in ids if i_d not in h_df["mlb_id"].values]:
             player = Team.get_player_api(i_d)
             position = player["primaryPosition"]["code"]
@@ -876,6 +917,7 @@ class Team(metaclass=IterTeam):
             ids[idx] = int(new_row["mlb_id"])
             h_df = h_df.append(new_row, ignore_index=True)
         return h_df
+
     @staticmethod
     def set_order_h_df(h_df, ids):
         sorter = dict(zip(ids, range(len(ids))))
@@ -893,9 +935,10 @@ class Team(metaclass=IterTeam):
             h_df.loc[h_df["bat_side"] == "S", "bat_side"] = "R"
         return h_df
 
-    ## TODO reference the series' origin
     @staticmethod
-    def set_pit_per_pa_h_df(h_df_series, h_df, p_df, lefties, righties):
+    def set_pit_per_pa_h_df(pitcher_hand, h_df, p_df, lefties, righties):
+        key = "pitches_pa_" + pitcher_hand
+        h_df_series = h_df[key]
         splits = {"_vl": lefties, "_vr": righties}
         h_weight = (h_df_series * settings.H_PIT_PER_AB_WGT)
         for col, filt in splits.items():
@@ -906,8 +949,7 @@ class Team(metaclass=IterTeam):
     @cached_property
     def opp_sp_df(self):
         try:
-            p_info = self.opp_sp
-            pitcher = api_pitcher_info_dict(p_info)
+            pitcher = api_pitcher_info_dict(self.opp_sp)
             pitcher["team"] = self.opp_name
             p_df = Team.join_player_stats(pd.DataFrame([pitcher]), hitters=False)
         except TypeError:
@@ -928,184 +970,278 @@ class Team(metaclass=IterTeam):
         p_df["pitches_start"].fillna(adjustment_df.median(), inplace=True)
         return p_df
 
+    def init_h_df(self):
+        lineup_ids = self.lineup
+        lineup = pd.DataFrame(lineup_ids, columns=["mlb_id"])
+        roster = pd.DataFrame(self.full_roster)
+        h_df = Team.join_player_stats(pd.merge(lineup, roster, on="mlb_id"))
+        h_df = h_df.loc[~h_df.duplicated(subset=["mlb_id"])]
+        if len(h_df.index) < 9 and not self.custom_lineup:
+            h_df = self.add_missing_players_h_df(h_df, lineup_ids)
+        assert len(h_df.index) == 9, f"{self.name}' lineup has {len(h_df.index)} players."
+        h_df = Team.set_order_h_df(h_df, lineup_ids)
+        h_df = Team.set_switch_hand_h_df(h_df, self.opp_sp_hand)
+        h_df = Team.adjust_non_qualified_h(h_df)
+        return h_df
+    
+    def set_pitches_start_p_df(self, p_df):
+        if not self.opp_instance.custom_pps:
+            p_df = Team.adjust_na_pitches_start_p_df(p_df)
+        else:
+            p_df["pitches_start"] = self.opp_instance.custom_pps
+        return p_df
+
+    @staticmethod
+    def set_expected_pitches_pa_h_df(h_df, p_df):
+        pitches_ab_array = h_df["pitches_pa_sp"].to_numpy()
+        pitches = p_df['pitches_start'].item()
+        idx = 0
+        total_batters_faced = 0
+        while pitches > 0:
+            pitches -= pitches_ab_array[idx]
+            total_batters_faced += 1
+            if idx < 9:
+                idx += 1
+            else:
+                idx = 0
+        p_df["exp_x_lu"] = total_batters_faced / settings.LU_LENGTH
+        h_df["sp_exp_x_lu"] = p_df["exp_x_lu"].max()
+        p_df["exp_bf"] = total_batters_faced
+        sp_rollover = floor((p_df["exp_x_lu"] % 1) * settings.LU_LENGTH)
+        h_df.loc[h_df["order"] <= sp_rollover, "exp_pa_sp"] = ceil(p_df["exp_x_lu"])
+        h_df.loc[h_df["order"] > sp_rollover, "exp_pa_sp"] = floor(p_df["exp_x_lu"])
+        h_df['exp_pitches'] = h_df['exp_pa_sp'] * h_df["pitches_pa_sp"]
+        return h_df, p_df
+
+    @staticmethod
+    def set_sp_stats_h_df(h_df, p_df, stats_to_calculate, splits, bp= False):
+        multiplier = h_df["exp_pa_sp"]
+        for stat, wgts_keys in stats_to_calculate.items():
+            for lr_filt, hand in splits.items():
+                p_key = wgts_keys["keys"]["p"] + hand
+                p_wgt = wgts_keys["weights"]["p"]
+                p_stat = (p_df[p_key].max())
+                h_key = wgts_keys["keys"]["h"]
+                h_wgt = wgts_keys["weights"]["h"]
+                p_calc = (p_stat * p_wgt)
+                h_calc = (h_df[h_key] * h_wgt)
+                h_df.loc[lr_filt, stat] = ((p_calc + h_calc) * multiplier)
+                per_pa_stat = wgts_keys["per_pa_name"]
+                h_df.loc[lr_filt, per_pa_stat] = ((p_calc + h_calc) * multiplier)
+        return h_df
+
+    @cached_property
+    def get_stats_to_calculate_sp_h_df(self):
+        return {
+                "exp_ps_sp": {
+                    "weights": {
+                        "h": settings.H_PTS_WEIGHT,
+                        "p": settings.P_PTS_WEIGHT, 
+                    },
+                    "keys": {
+                        "h": "fd_wps_pa_" + self.o_split,
+                        "p": "fd_wpa_b_"
+                    },
+                    "per_pa_name": "exp_ps_sp_pa"
+                },
+
+                "exp_pc_sp": {
+                    "weights": {
+                        "h": settings.H_PTS_WEIGHT,
+                        "p": settings.P_PTS_WEIGHT, 
+                    },
+                    "keys": {
+                        "h": "fd_wpa_pa_" + self.o_split,
+                        "p": "fd_wps_b_"
+                    },
+                    "per_pa_name": "exp_pc_sp_pa"
+                    
+                },
+                "exp_k": {
+                    "weights": {
+                        "h": settings.H_K_WEIGHT,
+                        "p": settings.P_K_WEIGHT, 
+                    },
+                    "keys": {
+                        "h": "k_pa_" + self.o_split,
+                        "p": "k_b_"
+                    },
+
+                    "per_pa_name": "exp_k_pa"
+                    
+                }
+
+            }
+    def set_sp_split_h_df(self, h_df):
+        stat = self.get_stats_to_calculate_sp_h_df["exp_ps_sp"]["keys"]["h"]
+        h_df["sp_split"] = h_df[stat]
+        return h_df
+
+    def set_exp_ps_sp_raw_hf_df(self, h_df):
+        stat =  self.get_stats_to_calculate_sp_h_df["exp_ps_sp"]["keys"]["h"]
+        h_df["exp_ps_sp_raw"] = h_df[stat] * h_df["exp_pa_sp"]
+        return h_df
+
+    def set_exp_pc_sp_raw(self, h_df):
+        stat = self.get_stats_to_calculate_sp_h_df["exp_pc_sp"]["keys"]["h"]
+        h_df["exp_pc_sp_raw"] = h_df[stat]
+        return h_df
+
+
+    @staticmethod
+    def set_sp_mu_h_df(h_df, p_df, splits):
+        for hand, lr_filt in splits:
+            h_df.loc[lr_filt, "sp_mu"] = p_df["fd_wpa_b_" + hand].max()
+            
+        return h_df
+
+    def set_raw_exp_pc_sp_h_df(self, h_df):
+        stat = self.get_stats_to_calculate_sp_h_df["exp_pc_sp"]["keys"]["h"]
+        h_df["raw_exp_pc_sp"] = h_df[stat] * h_df["exp_pa_sp"]
+        return h_df
+
+    def set_exp_k_sp_raw_h_df(self, h_df):
+        stat = self.get_stats_to_calculate_sp_h_df["exp_k"]["keys"]["h"]
+        h_df["exp_k_sp_raw"] = (h_df[stat] * h_df["exp_pa_sp"])
+        return h_df
+
+    def set_exp_hits_sp_h_df(self, h_df):
+        stat = "rb-_pa_" + self.o_split
+        h_df['exp_hits_sp'] = (h_df[stat] * h_df["exp_pa_sp"])
+        return h_df
+
+    def set_sp_exp_inn_h_df(self, h_df, p_df, righties, lefties):
+
+                exp_pa = {
+                    "r": h_df.loc[righties, "exp_pa_sp"].sum(),
+                    "l": h_df.loc[lefties, "exp_pa_sp"].sum()
+                }
+
+                r_pa = exp_pa["r"]
+                l_pa = exp_pa["l"]
+                #round or floor?
+                exp_hits_lu = floor(h_df['exp_hits_sp'].sum())
+                r_runners = (r_pa * p_df["ra-_b_vr"].max())
+                l_runners = (l_pa * p_df["ra-_b_vl"].max())
+                p_wgt = settings.P_HITS_ALLOWED_WEIGHT
+                h_wgt = settings.H_HITS_ALLOWED_WEIGHT
+                calc = (((r_runners + l_runners) * p_wgt) + (exp_hits_lu * h_wgt))
+                p_df["exp_ra"] = floor(calc)
+                p_df["exp_inn"] = (p_df["exp_bf"].max() - p_df["exp_ra"].max()) / 3
+                h_df["sp_exp_inn"] = p_df["exp_inn"].max()
+
+                return h_df
+
+    def calculate_exp_bp_inn(self, p_df):
+        if self.is_home:
+            exp_bp_inn = settings.BP_INNINGS_HOME - p_df["exp_inn"].max()
+        else:
+            exp_bp_inn = settings.BP_INNINGS_ROAD - p_df["exp_inn"].max()
+        return exp_bp_inn
+
+    def calculate_exp_bf_bp(self, bp, exp_bp_inn):
+        min_batter_bp = (exp_bp_inn * 3)
+        try: 
+            exp_runners_allowed_bp = (min_batter_bp * bp["ra-_b_rp"].mean())
+        except ValueError:
+            branch = a_dfs["P"]["BP"]["RAW"]["raw"]
+            exp_runners_allowed_bp = branch["ra-_b_rp"].median()
+        exp_bf_bp = round(min_batter_bp + exp_runners_allowed_bp)
+        return exp_bf_bp
+
+    def set_exp_pa_bp_h_df(self, h_df, p_df, exp_bf_bp):
+        #eg pitcher is going through lineup 2.1 times,
+        #get batters who are projected to face them twice
+        #use the smallest index, or highest player in order
+        #as the player who will take the first ab first the bp
+        filt = (h_df["exp_pa_sp"] == floor(p_df["exp_x_lu"]))
+        idx = h_df.loc[filt, "order"].idxmin()
+        order = h_df.loc[idx, "order"].item()
+        h_df["exp_pa_bp"] = 0
+        while exp_bf_bp > 0:
+            if order == 10:
+                order = 1
+            h_df.loc[h_df["order"] == order, "exp_pa_bp"] += 1
+            order += 1
+            exp_bf_bp -= 1
+        return h_df
+
+    def set_exp_ps_bp_h_df(self, h_df, bp, splits):
+        p_wgt = settings.P_PTS_WEIGHT
+        h_wgt = settings.H_PTS_WEIGHT
+        for hand, lr_split in splits.items():
+            p_col = "fd_wpa_b_"+ hand
+            calc = ((bp[p_col].mean() * p_wgt) + (h_df["fd_wps_pa"] * h_wgt))
+            h_df.loc[lr_split, "exp_ps_bp"] = h_df["exp_pa_bp"] * calc
+        return h_df
+
+    def set_exp_ps_raw_h_df(self, h_df):
+        h_df["exp_ps_raw"] = h_df["exp_ps_sp"] + h_df["exp_ps_bp"]
+        return h_df
+
+        
     def lineup_df(self):
         file = pickle_path(
             name=f"{self.name}_lu_{tf.today}", directory=settings.LINEUP_DIR
         )
-        daily_info = Team.daily_info()
-        confirmed = Team.check_confirmed_lineup(daily_info, self.name)
-        reset_flag = self.should_reset_lineup())
         path = settings.LINEUP_DIR.joinpath(file)
-        if (not confirmed or reset_flag):
-            self.del_props()
+        daily_info = Team.daily_info()
+        confirmed = Team.check_confirmed_lu(daily_info, self.name)
+        reset_flag = self.should_reset_lineup()
         if not path.exists() or (not confirmed or reset_flag):
-            lineup_ids = self.lineup
-            lineup = pd.DataFrame(lineup_ids, columns=["mlb_id"])
-            roster = pd.DataFrame(self.full_roster)
-            h_df = Team.join_player_stats(pd.merge(lineup, roster, on="mlb_id"))
-            if not self.custom_lineup and len(h_df.index) < 9:
-                h_df = Team.add_missing_players_h_df(h_df, lineup_ids)
-            h_df = h_df.loc[~h_df.duplicated(subset=["mlb_id"])]
-            assert len(h_df.index) == 9, f"{self.name}' has {len(hf.index)} players."
-            h_df = Team.set_order_h_df(h_df, lineup_ids)
-            h_df = Team.set_switch_hand_h_df(h_df, self.opp_sp_hand)
-            h_df = Team.adjust_non_qualified_h(h_df)
+            self.del_props()
+            h_df = self.init_h_df()
             p_df = self.opp_sp_df
             lefties = Team.get_split_filter(h_df, "L")
             righties = Team.get_split_filter(h_df, "R")
+            splits = {"_vl": lefties, "_vr": righties}
             p_df = Team.adjust_non_qualified_p(p_df)
-            # p_ppb = Team.pitches_per_order(h_df, p_df)
-
-            if not self.opp_instance.custom_pps:
-                p_df = Team.adjust_na_pitches_start_p_df(p_df)
-            else:
-                p_df["pitches_start"] = self.opp_instance.custom_pps
+            p_df = self.set_pitches_start_p_df(p_df)
+            #setting column pitches_pa_sp column here
+            h_df = Team.set_pit_per_pa_h_df(self.o_split, h_df, p_df, lefties, righties)
+            #must call set_pit_per_pa_h_df() before this to set pitches_pa
+            h_df, p_df = Team.set_expected_pitches_pa_h_df(p_df, h_df)
             
-            
-                    
-            
-
-            key = "pitches_pa_" + self.o_split
-            series = h_df[key]
-            h_df = Team.set_pit_per_pa_h_df(series, h_df, p_df, lefties, righties)
-            
-            pitches_ab_array = h_df[key].to_numpy()
-            pitches = p_df['pitches_start'].item()
-            idx = 0
-            total_batters_faced = 0
-            while pitches > 0:
-                pitches -= pitches_ab_array[idx]
-                total_batters_faced += 1
-                idx += 1
-                if idx == 9:
-                    idx = 0
-            p_df["exp_x_lu"] = total_batters_faced / settings.LU_LENGTH
-            
-            # p_df["exp_x_lu"] = p_df["pitches_start"] / ((h_df[key].sum() * settings.H_PIT_PER_AB_WGT) + (p_ppb * settings.P_PIT_PER_AB_WGT))
-            h_df["sp_exp_x_lu"] = p_df["exp_x_lu"].max()
-            
-            print(
-                f"{p_df['name'].max()} expected to go through {self.name} LU {p_df['exp_x_lu'].max()} times. P:{p_ppb} LU: {h_df[key].sum()}"
-            )
-            p_df["exp_bf"] = total_batters_faced
-            # p_df["exp_bf"] = round((p_df["exp_x_lu"] * settings.LU_LENGTH))
-            sp_rollover = floor((p_df["exp_x_lu"] % 1) * settings.LU_LENGTH)
-            h_df.loc[h_df["order"] <= sp_rollover, "exp_pa_sp"] = ceil(p_df["exp_x_lu"])
-            h_df.loc[h_df["order"] > sp_rollover, "exp_pa_sp"] = floor(p_df["exp_x_lu"])
-            h_df['exp_pitches'] = h_df['exp_pa_sp'] * h_df[key]
-            # average_p_ab_top_lu = h_df.loc[(h_df['exp_pa_sp'] == h_df['exp_pa_sp'].max()), key].mean()
-            key = "fd_wps_pa_" + self.o_split
-            h_df.loc[lefties, "exp_ps_sp_pa"] = (
-                p_df["fd_wpa_b_vl"].max() * settings.P_PTS_WEIGHT
-            ) + (h_df[key] * settings.H_PTS_WEIGHT)
-            h_df.loc[righties, "exp_ps_sp_pa"] = (
-                p_df["fd_wpa_b_vr"].max() * settings.P_PTS_WEIGHT
-            ) + (h_df[key] * settings.H_PTS_WEIGHT)
-            h_df.loc[lefties, "exp_ps_sp"] = (
-                (p_df["fd_wpa_b_vl"].max() * settings.P_PTS_WEIGHT)
-                + (h_df[key] * settings.H_PTS_WEIGHT)
-            ) * h_df["exp_pa_sp"]
-            h_df.loc[righties, "exp_ps_sp"] = (
-                (p_df["fd_wpa_b_vr"].max() * settings.P_PTS_WEIGHT)
-                + (h_df[key] * settings.H_PTS_WEIGHT)
-            ) * h_df["exp_pa_sp"]
-            h_df.loc[lefties, "sp_mu"] = p_df["fd_wpa_b_vl"].max()
-            h_df.loc[righties, "sp_mu"] = p_df["fd_wpa_b_vr"].max()
-            h_df["sp_split"] = h_df[key]
-            h_df["exp_ps_sp_raw"] = h_df[key] * h_df["exp_pa_sp"]
-            # points conceded
-            key = "fd_wpa_pa_" + self.o_split
-            k_key = "k_pa_" + self.o_split
-           
-            h_df.loc[lefties, "exp_pc_sp"] = ((
-                p_df["fd_wps_b_vl"].max() * settings.P_PTS_WEIGHT
-            ) + (h_df[key] * settings.H_PTS_WEIGHT) * h_df["exp_pa_sp"])
-            h_df.loc[righties, "exp_pc_sp"] = ((
-                p_df["fd_wps_b_vr"].max() * settings.P_PTS_WEIGHT
-            ) + (h_df[key] * settings.H_PTS_WEIGHT) * h_df["exp_pa_sp"])
-            
-            h_df["exp_pc_sp_raw"] = (h_df[key])
-            h_df["raw_exp_pc_sp"] = (h_df[key] * h_df["exp_pa_sp"])
-            h_df.loc[lefties, "exp_k"] = ((
-                p_df["k_b_vl"].max() * settings.P_K_WEIGHT
-            ) + (h_df[k_key] * settings.H_K_WEIGHT) * h_df["exp_pa_sp"])
-            h_df.loc[righties, "exp_k"] = ((
-                p_df["k_b_vr"].max() * settings.P_K_WEIGHT
-            ) + (h_df[k_key] * settings.H_K_WEIGHT) * h_df["exp_pa_sp"])
-            # h_df.loc[lefties, 'exp_k'] = (((p_df['k_b_vl'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
-            # h_df.loc[righties, 'exp_k'] = (((p_df['k_b_vr'].max() * 1) + (h_df[k_key] * 1)) / 2) * h_df['exp_pa_sp']
-            h_df["exp_k_sp_raw"] = (h_df[k_key] * h_df["exp_pa_sp"])
-            exp_pa_r_sp = h_df.loc[righties, "exp_pa_sp"].sum()
-            exp_pa_l_sp = h_df.loc[lefties, "exp_pa_sp"].sum()
-            key = "rb-_pa_" + self.o_split
-            h_df['exp_hits_sp'] = (h_df[key] * h_df["exp_pa_sp"])
-            exp_hits_lu = floor(h_df['exp_hits_sp'].sum())
-            p_df["exp_ra"] = (floor(
-                (exp_pa_r_sp * p_df["ra-_b_vr"].max()) * settings.P_HITS_ALLOWED_WEIGHT
-                + (exp_pa_l_sp * p_df["ra-_b_vl"].max()))
-             + (exp_hits_lu * settings.H_HITS_ALLOWED_WEIGHT))
-            p_df["exp_inn"] = (p_df["exp_bf"].max() - p_df["exp_ra"].max()) / 3
-            h_df["sp_exp_inn"] = p_df["exp_inn"].max()
-            if self.is_home:
-                exp_bp_inn = settings.BP_INNINGS_HOME - p_df["exp_inn"].max()
-            else:
-                exp_bp_inn = settings.BP_INNINGS_ROAD - p_df["exp_inn"].max()
-            
-
-            
+            stats_to_calculate = self.get_stats_to_calculate_sp_h_df
+            h_df = Team.set_sp_stats_h_df(h_df, p_df, stats_to_calculate, splits)            
+            h_df = Team.set_sp_mu_h_df(h_df, p_df, splits)
+            h_df = self.set_sp_split_h_df(h_df)
+            h_df = self.set_exp_ps_sp_raw_hf_df(h_df)
+            h_df = self.set_exp_pc_sp_raw(h_df)
+            h_df = self.set_raw_exp_pc_sp_h_df(h_df)
+            h_df = self.set_exp_k_sp_raw_h_df(h_df)
+            h_df = self.set_exp_hits_sp_h_df(h_df)
+            h_df = self.set_sp_exp_inn_h_df(h_df, p_df, righties, lefties)
+            exp_bp_inn = self.calculate_exp_bp_inn(p_df)
             bp = Team.adjust_non_qualified_p(self.proj_opp_bp, bullpen = True)
-            try:
-                exp_bf_bp = round(
-                    (exp_bp_inn * 3) + ((exp_bp_inn * 3) * bp["ra-_b_rp"].mean())
-                )
-            except ValueError:
-                print(f"USING DEFAULT BP RA- for {self.name}")
-                exp_bf_bp = round(
-                    (exp_bp_inn * 3)
-                    + (
-                        (exp_bp_inn * 3)
-                        * a_dfs["P"]["BP"]["RAW"]["raw"]["ra-_b_rp"].median()
-                    )
-                )
+            exp_bf_bp = self.calculate_exp_bf_bp(bp, exp_bp_inn)
+            h_df = self.set_exp_pa_bp_h_df(h_df, p_df, exp_bf_bp)
+            h_df = self.set_exp_ps_bp_h_df(h_df, bp, splits)
+            h_df = self.set_exp_ps_raw_h_df(h_df)
+            # def set_point_increase_h_df(self, h_df, lefties, rightes):
 
-            first_bp_pa = h_df.loc[
-                (h_df["exp_pa_sp"] == floor(p_df["exp_x_lu"])), "order"
-            ].idxmin()
-            order = h_df.loc[first_bp_pa, "order"].item()
-            h_df["exp_pa_bp"] = 0
-            while exp_bf_bp > 0:
-                if order == 10:
-                    order = 1
-                h_df.loc[h_df["order"] == order, "exp_pa_bp"] += 1
-                order += 1
-                exp_bf_bp -= 1
-            h_df.loc[lefties, "exp_ps_bp"] = h_df["exp_pa_bp"] * (
-                (bp["fd_wpa_b_vl"].mean() * settings.P_PTS_WEIGHT) + (h_df["fd_wps_pa"] * settings.H_PTS_WEIGHT)
-            )
-            h_df.loc[righties, "exp_ps_bp"] = h_df["exp_pa_bp"] * (
-                (bp["fd_wpa_b_vr"].mean() * settings.P_PTS_WEIGHT) + (h_df["fd_wps_pa"] * settings.H_PTS_WEIGHT)
-            )
+            # @staticmethod
+            # def set_point_increase_p_df(p_df, to_calculate):
+            #     base = p_df["exp_ps_raw"].max()
+            #     results = [base]
+            #     for point_column, multiplier in to_calculate.items():
+            #         p_df[point_column] = ((base * (-multiplier % 2)) - base)
+            #         results.append(p_df[point_column].max())
+            #     p_df["points"] = sum(results)
+            #     return p_df
 
-            # h_df['exp_ps_bp'] = h_df['exp_pa_bp'] * (((bp['fd_wpa_b_rp'].mean() * 1) + (h_df['fd_wps_pa'] * 1)) / 2)
-            h_df["exp_ps_raw"] = h_df["exp_ps_sp"] + h_df["exp_ps_bp"]
-            h_df.loc[lefties, "venue_points"] = (
-                h_df["exp_ps_raw"] * self.next_venue_boost_lhb
-            ) - h_df["exp_ps_raw"]
-            h_df.loc[righties, "venue_points"] = (
-                h_df["exp_ps_raw"] * self.next_venue_boost_rhb
-            ) - h_df["exp_ps_raw"]
-            h_df = calculate_team_lu_points(self, h_df)
-            # self.raw_points = h_df["exp_ps_raw"].sum()
-            # self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
-            # self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
-            # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
+
+
             
-            # self.venue_points = h_df["venue_points"].sum()
-            # self.points = (
-            #     self.venue_points + self.temp_points + self.ump_points + self.raw_points
-            # )
-            # self.venue_points = (self.raw_points * self.next_venue_boost) - self.raw_points
 
+
+
+
+            
+            
+            h_df.loc[lefties, "venue_points"] = (h_df["exp_ps_raw"] * self.next_venue_boost_lhb) - h_df["exp_ps_raw"]
+            h_df.loc[righties, "venue_points"] = (h_df["exp_ps_raw"] * self.next_venue_boost_rhb) - h_df["exp_ps_raw"]
+            h_df = self.calculate_team_lu_points(h_df)
             h_df['temp_points'] = (h_df['exp_ps_raw'] * self.temp_boost) - h_df['exp_ps_raw']
             h_df['ump_points'] = (h_df['exp_ps_raw'] * self.ump_boost) - h_df['exp_ps_raw']
             h_df['points'] = h_df['venue_points'] + h_df['temp_points'] + h_df['ump_points'] + h_df['exp_ps_raw']
@@ -1115,103 +1251,86 @@ class Team(metaclass=IterTeam):
             h_df = pd.read_pickle(path)
             lefties = Team.get_split_filter(h_df, "L")
             righties = Team.get_split_filter(h_df, "R")
-            h_df.loc[lefties, "venue_points"] = (
-                h_df["exp_ps_raw"] * self.next_venue_boost_lhb
-            ) - h_df["exp_ps_raw"]
-            h_df.loc[righties, "venue_points"] = (
-                h_df["exp_ps_raw"] * self.next_venue_boost_rhb
-            ) - h_df["exp_ps_raw"]
-            h_df["temp_points"] = (h_df["exp_ps_raw"] * self.temp_boost) - h_df[
-                "exp_ps_raw"
-            ]
-            h_df["ump_points"] = (h_df["exp_ps_raw"] * self.ump_boost) - h_df[
-                "exp_ps_raw"
-            ]
-            h_df["points"] = (
-                h_df["venue_points"]
-                + h_df["temp_points"]
-                + h_df["ump_points"]
-                + h_df["exp_ps_raw"]
-            )
+            h_df.loc[lefties, "venue_points"] = (h_df["exp_ps_raw"] * self.next_venue_boost_lhb) - h_df["exp_ps_raw"]
+            h_df.loc[righties, "venue_points"] = (h_df["exp_ps_raw"] * self.next_venue_boost_rhb) - h_df["exp_ps_raw"]
+            h_df["temp_points"] = (h_df["exp_ps_raw"] * self.temp_boost) - h_df["exp_ps_raw"]
+            h_df["ump_points"] = (h_df["exp_ps_raw"] * self.ump_boost) - h_df["exp_ps_raw"]
+            h_df["points"] = (h_df["venue_points"]+ h_df["temp_points"]+ h_df["ump_points"]+ h_df["exp_ps_raw"])
             # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp'] + h_df['exp_ps_bp']
-            # self.raw_points = h_df["exp_ps_raw"].sum()
-            # self.venue_points = h_df["venue_points"].sum()
-            # self.temp_points = (self.raw_points * self.temp_boost) - self.raw_points
-            # self.ump_points = (self.raw_points * self.ump_boost) - self.raw_points
-            # self.points = (
-            #     self.venue_points + self.temp_points + self.ump_points + self.raw_points
-            # )
-            # self.sp_mu = h_df["sp_mu"].sum()
-            # self.lu_talent_sp = h_df["sp_split"].sum() - h_df["sp_split"].std(ddof=0)
             # h_df.loc[h_df['is_platoon'] == True, 'exp_ps_raw'] = h_df['exp_ps_sp']
-            h_df = calculate_team_lu_points(self, h_df)
+            h_df = self.calculate_team_lu_points(h_df)
         return h_df
     
         
-        
+    def should_reset_sp_df(self):
+        individual_reset = self.name in settings.reset_specific_pitchers
+        global_reset = settings.reset_all_pitchers
+        return any(individual_reset, global_reset)
+
+    
+    @staticmethod
+    def set_point_increase_p_df(p_df, to_calculate):
+        base = p_df["exp_ps_raw"].max()
+        results = [base]
+        for point_column, multiplier in to_calculate.items():
+            p_df[point_column] = ((base * (-multiplier % 2)) - base)
+            results.append(p_df[point_column].max())
+        p_df["points"] = sum(results)
+        return p_df
+
+    @staticmethod
+    def set_exp_inn_p_df(p_df, h_df):
+        p_df["exp_inn"] = h_df["sp_exp_inn"].max()
+        return p_df
+
+    @staticmethod
+    def set_stats_p_df(p_df, h_df, stats_to_calculate):
+        for p_stat, h_stat in stats_to_calculate.items():
+            p_df[p_stat] = h_df[h_stat].sum() - h_df[h_stat].std(ddof=0)
+        return p_df
 
     def sp_df(self):
-        daily_info = Team.daily_info()
         projected_sp = self.projected_sp()
         slug = projected_sp["nameSlug"]
         file = pickle_path(name=f"{slug}_{tf.today}", directory=settings.SP_DIR)
         path = settings.SP_DIR.joinpath(file)
-        if path.exists() and self.name not in settings.reset_specific_pitchers and not settings.reset_all_pitchers:
+        points_to_calculate = {
+            "venue_points": self.next_venue_boost,  
+            "temp_points": self.temp_boost,
+            "ump_points": self.ump_boost
+                              }
+        stats_to_calculate = {
+            "k_pred": "exp_k",
+            "k_pred_raw": "exp_k_sp_raw",
+            "exp_ps_raw": "exp_pc_sp",
+            "mu": "exp_pc_sp",
+            "raw_mu": "raw_exp_pc_sp"
+                            }
+        if path.exists() and not self.should_reset_sp_df():
             p_df = pd.read_pickle(path)
-            p_df["venue_points"] = (
-                p_df["exp_ps_raw"] * (-self.next_venue_boost % 2)
-            ) - p_df["exp_ps_raw"]
-            p_df["temp_points"] = (p_df["exp_ps_raw"] * (-self.temp_boost % 2)) - p_df[
-                "exp_ps_raw"
-            ]
-            p_df["ump_points"] = (p_df["exp_ps_raw"] * (-self.ump_boost % 2)) - p_df[
-                "exp_ps_raw"
-            ]
-            p_df["points"] = (
-                p_df["exp_ps_raw"]
-                + p_df["venue_points"]
-                + p_df["temp_points"]
-                + p_df["ump_points"]
-            )
-            p_df["env_points"] = self.env_avg
-            return p_df
-        try:
-            p_info = projected_sp
-            player = api_pitcher_info_dict(p_info)
-            player["team"] = self.name
-            p_df = Team.join_player_stats(pd.DataFrame([player]), hitters=False)
-            
-        except TypeError:
-            print("Getting default SP stats.")
-            p_df = Team.default_sp()
-        h_df = self.opp_instance.lineup_df()
-        p_df["opponent"] = self.opp_instance.name
-        p_df["exp_inn"] = h_df["sp_exp_inn"].max()
-        p_df["k_pred"] = (h_df["exp_k"].sum() - h_df["exp_k"].std(ddof=0))
-        p_df["k_pred_raw"] = h_df["exp_k_sp_raw"].sum() - h_df["exp_k_sp_raw"].std(
-            ddof=0
-        )
-        p_df["exp_ps_raw"] = (
-            h_df["exp_pc_sp"].sum() - h_df["exp_pc_sp"].std(ddof=0)
-        )
-        p_df["mu"] = h_df["exp_pc_sp"].sum() - h_df["exp_pc_sp"].std(ddof=0)
-        p_df["raw_mu"] = h_df["raw_exp_pc_sp"].sum() - h_df["raw_exp_pc_sp"].std(ddof=0)
-        
-        
-        
-
-        p_df['venue_points'] = (p_df['exp_ps_raw'] * (-self.next_venue_boost % 2)) - p_df['exp_ps_raw']
-        p_df['temp_points'] = (p_df['exp_ps_raw'] * (-self.temp_boost % 2)) - p_df['exp_ps_raw']
-        p_df['ump_points'] = (p_df['exp_ps_raw'] * (-self.ump_boost % 2)) - p_df['exp_ps_raw']
-        p_df['points'] = p_df['exp_ps_raw'] + p_df['venue_points'] + p_df['temp_points'] + p_df['ump_points']
-        p_df['ump_avg'] = self.ump_avg
-        p_df['venue_temp'] = self.venue_temp
-        p_df['venue_avg'] = self.venue_avg
-        p_df['env_points'] = self.env_avg
-        
-        if self.name in daily_info['confirmed_sp']:
-            pickle_dump(p_df, file)
-
+        else:
+            try:
+                player = api_pitcher_info_dict(projected_sp)
+                player["team"] = self.name
+                raw_df = pd.DataFrame([player])
+                p_df = Team.join_player_stats(raw_df, hitters=False)
+            except TypeError:
+                p_df = Team.default_sp()
+            #initializing opp__lineup_df, which does most calculation
+            h_df = self.opp_instance.lineup_df()
+            #Not sure if some or all of this should be in the else
+            p_df['ump_avg'] = self.ump_avg
+            p_df['venue_temp'] = self.venue_temp
+            p_df['venue_avg'] = self.venue_avg
+            p_df['env_points'] = self.env_avg
+            p_df = Team.set_point_increase_p_df(p_df, points_to_calculate)
+            p_df = Team.set_exp_inn_p_df(p_df, h_df)
+            p_df = Team.set_stats_p_df(p_df, h_df, stats_to_calculate)
+            daily_info = Team.daily_info()
+            opp_lu_confirmed = Team.check_confirmed_lu(daily_info, self.opp_name)
+            sp_confirmed = Team.check_confirmed_sp(daily_info, self.name)
+            if opp_lu_confirmed and sp_confirmed:
+                pickle_dump(p_df, file)
         return p_df
 
     def live_game(self):
@@ -1315,29 +1434,35 @@ class Team(metaclass=IterTeam):
     @cached_property
     def projected_ump_data(self):
         return game_data[game_data["umpire"] == self.projected_ump_id]
+    
+    @staticmethod
+    def get_game_venue_id(game):
+        return game["gameData"]["venue"]["id"]
 
     @cached_property
     def next_venue(self):
         if self.next_game_pk:
-            v_id = self.next_game["gameData"]["venue"]["id"]
-            return v_id
+            return Team.get_game_venue_id(self.next_game)
         return self.next_game_pk
 
     @cached_property
     def last_venue(self):
         if self.last_game_pk:
-            return self.last_game["gameData"]["venue"]["id"]
+            return Team.get_game_venue_id(self.last_game)
         return self.last_game_pk
 
     @cached_property
     def home_venue(self):
         return team_info[self.name]["venue"]["id"]
 
+    @staticmethod
+    def get_venue_data(venue_id):
+        return game_data[game_data["venue_id"] == venue_id]
+
     @cached_property
     def next_venue_data(self):
         if self.next_game_pk:
-            # return venue_data.loc[self.next_venue]
-            return game_data[game_data["venue_id"] == self.next_venue]
+            return Team.get_venue_data(self.next_venue)
         return self.next_game_pk
 
     @cached_property
@@ -1350,10 +1475,14 @@ class Team(metaclass=IterTeam):
     def home_venue_data(self):
         return game_data[game_data["venue_id"] == self.home_venue]
 
+    @staticmethod
+    def get_game_weather(game):
+        return game["gameData"]["weather"]
+
     @cached_property
     def weather(self):
         if self.next_game_pk:
-            return self.next_game["gameData"]["weather"]
+            return Team.get_game_weather(game)
         return self.next_game_pk
 
     @cached_property
@@ -1372,17 +1501,11 @@ class Team(metaclass=IterTeam):
                 try:
                     return int(wind_description.split(" ")[0])
                 except (TypeError, ValueError):
-                    if not np.isnan(avg_wind):
-                        return avg_wind
-                    return 0
-            else:
-                if not np.isnan(avg_wind):
-                    return avg_wind
-                return 0
-        else:
-            if not np.isnan(avg_wind):
-                return avg_wind
-            return 0
+                    pass
+        if not np.isnan(avg_wind):
+            return avg_wind
+        return 0
+        
 
     @cached_property
     def wind_direction(self):
@@ -1401,7 +1524,6 @@ class Team(metaclass=IterTeam):
         if self.weather:
             condition = self.weather.get("condition")
             if condition in mac.weather.rain:
-
                 daily_info = Team.daily_info()
                 if self.name not in daily_info["rain"]:
                     daily_info["rain"].append(self.name)
@@ -1425,9 +1547,9 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def roof_closed(self):
-        return (
+        return ((
             self.next_has_roof and not self.venue_condition
-        ) or self.venue_condition in mac.weather.roof_closed
+        ) or self.venue_condition in mac.weather.roof_closed)
 
     @cached_property
     def home_has_roof(self):
@@ -1450,11 +1572,16 @@ class Team(metaclass=IterTeam):
             for i in self.last_venue_data["condition"].unique()
         )
 
+    @staticmethod
+    def get_game_date(game):
+        date = game["gameData"]["datetime"]["originalDate"]
+        return datetime.date.fromisoformat(date)
+
     @cached_property
     def no_rest(self):
         if self.last_game_pk:
-            date = self.last_game["gameData"]["datetime"]["originalDate"]
-            if datetime.date.fromisoformat(date) >= tf.yesterday:
+            date = Team.get_game_date(self.last_game)
+            if date >= tf.yesterday:
                 return True
             return False
         return self.last_game_pk
@@ -1523,7 +1650,7 @@ class Team(metaclass=IterTeam):
     
     @cached_property
     def wind_out_data(self):
-        return self.wind_out_data[1]
+        return self.wind_data[1]
 
     @cached_property
     def wind_in_or_out(self):
@@ -1532,7 +1659,7 @@ class Team(metaclass=IterTeam):
         return False
 
     @cached_property
-    def sufficient_wind_data(self):
+    def wind_data_sufficient(self):
         sufficient = settings.MIN_GAMES_VENUE_WIND
         in_sufficient = len(self.wind_in_data.index) >= sufficient
         out_sufficient = len(self.wind_out_data.index) >= sufficient
@@ -1552,7 +1679,7 @@ class Team(metaclass=IterTeam):
     def wind_factor(self):
         is_factor = all(
                         self.wind_in_or_out,
-                        self.sufficient_wind_data,
+                        self.wind_data_sufficient,
                         self.logical_wind_data,
                         self.sufficient_wind_speed
                         )
@@ -1561,7 +1688,6 @@ class Team(metaclass=IterTeam):
     @cached_property
     def next_venue_boost_data(self):
         data = self.boost_data
-        
         if self.wind_factor:
             if self.wind_out:
                 data = self.wind_out_data
@@ -1571,6 +1697,7 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def next_venue_boost(self):
+        ## TODO this is awful
         data = self.next_venue_boost_data
         q_venues = self.qualified_venues
         pts_pa_next_venue = data["fd_points"].sum() / data["adj_pa"].sum()
@@ -1629,37 +1756,42 @@ class Team(metaclass=IterTeam):
     @cached_property
     def temp_boost(self):
         if self.venue_temp:
-            return self.temp_avg / game_data["fd_points"].mean()
+            return self.temp_avg / Team.avg_fanduel_points_game
         return 1
+
+    @cached_property
+    def ump_data_sufficient(self):
+        return len(self.projected_ump_data) >= settings.MIN_UMP_SAMP
+
 
     @cached_property
     def ump_boost(self):
-        if len(self.projected_ump_data.index) >= settings.MIN_UMP_SAMP:
-            return (
-                self.projected_ump_data["fd_points"].mean()
-                / game_data["fd_points"].mean()
-            )
-        return 1
+        boost = 1
+        if self.ump_data_sufficient:
+            boost = self.ump_avg / Team.avg_fanduel_points_game
+        return boost
 
     @cached_property
     def ump_avg(self):
-        if len(self.projected_ump_data.index) >= settings.MIN_UMP_SAMP:
+        if self.ump_data_sufficient:
             return self.projected_ump_data["fd_points"].mean()
-        return game_data["fd_points"].mean()
+        return Team.avg_fanduel_points_game
 
     @cached_property
     def env_avg(self):
-        temp = self.temp_avg
-        ump = self.ump_avg
-        venue = self.venue_avg
         if self.roof_closed:
-            sample = game_data[game_data["condition"].isin(mac.weather.roof_closed)]
-            temp = sample["fd_points"].mean()
-        return ((temp * settings.ENV_TEMP_WEIGHT) + 
-                (venue * settings.ENV_VENUE_WEIGHT) + 
-                (ump * settings.ENV_UMP_WEIGHT))
-
+            data = game_data[game_data["condition"].isin(mac.weather.roof_closed)]
+            temp_avg = data["fd_points"].mean()
+        else:
+            temp_avg = self.temp_avg
+        ump_avg = self.ump_avg
+        venue_avg = self.venue_avg
+        return ((temp_avg * settings.ENV_TEMP_WEIGHT) + 
+                (venue_avg * settings.ENV_VENUE_WEIGHT) + 
+                (ump_avg * settings.ENV_UMP_WEIGHT))
+    
     def sp_avg(self, return_full_dict=False):
+        ## TODO either get rid of this or move it or improve it
         away = game_data[(game_data["away_sp"] == self.opp_sp["id"])]
         home = game_data[(game_data["home_sp"] == self.opp_sp["id"])]
         if len(away.index) > 0:
@@ -1720,14 +1852,14 @@ class Team(metaclass=IterTeam):
             bp = pd.read_pickle(path)
             return bp
         bp = self.opp_instance.bullpen
-        bp = bp[(~bp["mlb_id"].isin(self.opp_instance.used_rp)) & (bp["status"] == "A")]
+        is_rested = (~bp["mlb_id"].isin(self.opp_instance.used_rp))
+        is_active = (bp["status"] == "A")
+        bp = bp[is_rested & is_active]
         if len(bp.index) < settings.RESTED_BP_SAMP:
             bp = self.opp_instance.bullpen
-
             bp = bp[(bp['status'] == 'A')]
-            bp['fd_wpa_b_rp'] = bp['fd_wpa_b_rp'] * settings.TIRED_BP_INCREASE
-            bp['fd_wpa_b_vr'] = bp['fd_wpa_b_vr'] * settings.TIRED_BP_INCREASE
-            bp['fd_wpa_b_vl'] = bp['fd_wpa_b_vl'] * settings.TIRED_BP_INCREASE
+            columns = ['fd_wpa_b_rp', 'fd_wpa_b_vr', 'fd_wpa_b_vl']
+            bp[columns] = bp[columns] * settings.TIRED_BP_INCREASE
         pickle_dump(bp, file)
         return bp
 
@@ -1743,9 +1875,9 @@ class Team(metaclass=IterTeam):
 
     @cached_property
     def proj_opp_bp(self):
-        return self.opp_bullpen.loc[
-            self.opp_bullpen["batters_faced_rp"].nlargest(settings.RESTED_BP_SAMP).index
-        ]
+        bullpen = self.opp_bullpen
+        key = "batters_faced_rp"
+        return bullpen.loc[bullpen[key].nlargest(settings.RESTED_BP_SAMP).index]
 
     @cached_property
     def opp_instance(self):
@@ -1762,32 +1894,14 @@ class Team(metaclass=IterTeam):
                 games = self.get_past_games(4)
             except IndexError:
                 games = self.past_games
-            game_ids = []
-            for game in games:
-                game_ids.append(Team.get_game_pk(game))
-            game_ids = ids_string(game_ids)
-            call = statsapi.get(
-                "schedule",
-                {"gamePks": game_ids, "sportId": 1, "hydrate": "probablePitcher"},
-            )
-            recent_sp = set()
-            for g in call["dates"]:
-                home_sp = (
-                    g["games"][0]["teams"]["home"].get("probablePitcher", {}).get("id")
-                )
-                away_sp = (
-                    g["games"][0]["teams"]["away"].get("probablePitcher", {}).get("id")
-                )
-                recent_sp.add(home_sp)
-                recent_sp.add(away_sp)
-
-            starters = self.pitcher[
-                (self.pitcher["batters_faced_sp"] > 0) & (self.pitcher["status"] == "A")
-            ]
+            game_ids = ids_string((Team.get_game_pk(game) for game in games))
+            recent_sp = Team.get_probable_pitchers_past_games(game_ids)
             if return_used_ids:
                 return recent_sp
-
-            return starters[~starters["mlb_id"].isin(recent_sp)]
+            has_started = (self.pitcher["batters_faced_sp"] > 0)
+            is_active = (self.pitcher["status"] == "A")
+            is_rested = (~self.pitcher["mlb_id"].isin(recent_sp))
+            return self.pitcher[has_started & is_active & is_rested]
         return set()
 
     def del_props(self):
@@ -1799,7 +1913,6 @@ class Team(metaclass=IterTeam):
             del self.lineup
         except AttributeError:
             pass
-
         return None
 
     def del_next_game(self):
@@ -1817,8 +1930,9 @@ class Team(metaclass=IterTeam):
         ## TODO delete the file at some point
         if not path.exists() and self.weather:
             daily_info = Team.daily_info()
-            name = self.name
-            if name in daily_info["confirmed_lu"] and name in daily_info["confirmed_sp"]:
+            lineup_confirmed = Team.check_confirmed_lu(daily_info, self.name)
+            sp_confirmed =  Team.check_confirmed_sp(daily_info, self.name)
+            if lineup_confirmed and sp_confirmed:
                 game = self.next_game
                 pickle_dump(game, file)
                 print(f"Cached {self.name}' next game.")
@@ -1866,3 +1980,6 @@ if __name__ == "__main__":
     twins = Team(mlb_id = 142, name = 'twins')
     white_sox = Team(mlb_id = 145, name = 'white sox')
     yankees = Team(mlb_id = 147, name = 'yankees')
+    test_team = angels
+
+    print(test_team.next_game_pk)
