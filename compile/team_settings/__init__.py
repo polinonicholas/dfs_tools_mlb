@@ -1,6 +1,7 @@
+from pathlib import Path
+
 from dfs_tools_mlb.compile.teams import Team
 from dfs_tools_mlb import settings
-from pathlib import Path
 from dfs_tools_mlb.settings import reset_team_vars, reset_all_team_vars
 for team in Team:
     team_file = Path(f"{settings.TEAM_DIR.joinpath(team.name)}.json")

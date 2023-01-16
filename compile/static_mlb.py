@@ -1,6 +1,7 @@
-from dfs_tools_mlb.utils.subclass import Map
 import re
 from functools import lru_cache
+
+from dfs_tools_mlb.utils.subclass import Map
 
 # from dfs_tools_mlb.utils.statsapi import event_types
 mlb_api_codes = Map(
